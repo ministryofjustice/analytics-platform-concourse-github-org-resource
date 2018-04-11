@@ -12,70 +12,26 @@ payload=$(mktemp request.XXXXXX)
 cat > $payload <&0
 
 # parse parameters
-access_token=$(jq -r '.source.access_token' < $payload)
+GITHUB_ACCESS_TOKEN=$(jq -r '.source.access_token' < $payload)
 name=$(jq -r '.source.name // ""' < $payload)
-skip_ssl_verification=$(jq -r '.source.skip_ssl_verification // false' < $payload)
-verify_ssl=''
-if $skip_ssl_verification; then
-    verify_ssl='-k'
-fi
+SKIP_SSL_VERIFICATION=$(jq -r '.source.skip_ssl_verification // false' < $payload)
 
 org="${destination}/org"
 repos="${destination}/repos"
-echo -n "" > $repos
+echo "" > $repos
 
-get_org() {
-    local url="https://api.github.com/orgs/${name}"
-    echo "Fetching ${name} org ..."
-    github_api_request "$url" > $org
-}
+source /opt/resource/common.sh
 
-github_api_request() {
-    curl $verify_ssl -s -H "Authorization: token $access_token" $@
-}
+org_version="none"
 
-next_url() {
-    while read -r line; do
-        if echo "$line" | grep -Eq '^Link:.*'; then
-            url=$(echo "$line" | sed 's/.*\(https[^>]*\).*rel="next".*/\1/')
-            if [[ "$url" = "$line" ]]; then
-                url=""
-            fi
-            echo "$url"
-            break
-        fi
-    done
-}
+get_org $name > $org
 
-split_headers() {
-    awk -v bl=1 'bl{bl=0; h=($0 ~ /HTTP\/1/)} /^\r?$/{bl=1} {print $0>(h?"'"$1"'":"'"$2"'")}'
-}
+repos_url="$(jq -r '.repos_url' < $org)?per_page=100"
 
-get_all() {
-    local url="$1"
-    local destfile="$2"
-    local headers=$(mktemp headers.XXXXXX)
-    local payloads=""
-    local i=0
+get_all $repos_url > $repos
 
-    while [ -n "$url" ]; do
-        body=$(mktemp body.XXXXXX)
-        payloads="$payloads $body"
+org_version=$(jq -r 'map(.pushed_at | fromdateiso8601) | sort | .[0]' < $repos)
 
-        echo "Fetching $url"
-        github_api_request -i "$url" | split_headers $headers $body
+echo "$(jq '. | length' $repos) repos found"
 
-        url=$(next_url < $headers)
-    done
-
-    # combine each payload into a single JSON array
-    jq -s '[.[][]]' $payloads > $destfile
-}
-
-
-if get_org; then
-    get_all "$(jq -r '.repos_url' < $org)?per_page=100" $repos
-    echo "$(jq '. | length' $repos) repos found"
-fi
-
-echo '{"version":{"ref":"none"}}' >&3
+echo "{\"version\":{\"ref\":\"$org_version\"}}" >&3
