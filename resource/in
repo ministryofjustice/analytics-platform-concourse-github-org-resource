@@ -1,37 +1,26 @@
-#!/bin/sh
+#!/usr/bin/env python
 
-set -e
-set -o pipefail
+import json
 
-exec 3>&1 # make stdout available as fd 3 for the result
-exec 1>&2 # redirect all output to stderr for logging
+from moj_analytics.concourse import Resource
 
-# read inputs
-destination=$1
-payload=$(mktemp request.XXXXXX)
-cat > $payload <&0
+from common import get_all, get_org, pushed_at
 
-# parse parameters
-GITHUB_ACCESS_TOKEN=$(jq -r '.source.access_token' < $payload)
-name=$(jq -r '.source.name // ""' < $payload)
-SKIP_SSL_VERIFICATION=$(jq -r '.source.skip_ssl_verification // false' < $payload)
 
-org="${destination}/org"
-repos="${destination}/repos"
-echo "" > $repos
+@Resource
+def get_org_repos(dest_dir, source={}, version=None, params={}):
+    print(f'Fetching {source["name"]} org')
+    org = get_org(**source)
+    with open(join(dest_dir, 'org'), 'w') as org_file:
+        json.dump(org, org_file)
 
-source /opt/resource/common.sh
+    print('Fetching org repos')
+    repos = get_all(org['repos_url'], **source)
+    with open(join(dest_dir, 'repos'), 'w') as repos_file:
+        json.dump(repos, repos_file)
 
-org_version="none"
+    print(f'{len(repos)} repos found')
 
-get_org $name > $org
+    timestamps = sorted(set(map(pushed_at, repos)))
 
-repos_url="$(jq -r '.repos_url' < $org)?per_page=100"
-
-get_all $repos_url > $repos
-
-org_version=$(jq -r 'map(.pushed_at | fromdateiso8601) | sort | .[0]' < $repos)
-
-echo "$(jq '. | length' $repos) repos found"
-
-echo "{\"version\":{\"ref\":\"$org_version\"}}" >&3
+    return timestamps[-1], {}

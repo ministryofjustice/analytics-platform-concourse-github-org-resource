@@ -1,3 +1,50 @@
-#!/bin/sh
+#!/usr/bin/env python
 
-echo '{"version":{"ref":"none"}}'
+from moj_analytics.concourse import Resource
+
+from common import get_all, get_org, pushed_at
+
+
+fly = '/usr/local/bin/fly'
+pipelines = {}
+
+
+@Resource
+def create_pipelines(src_dir, source={}, params={}):
+    print('Fetching existing pipelines')
+    pipelines.update(get_pipelines())
+
+    print(f'Fetching {source["name"]} org')
+    org = get_org(**source)
+
+    print('Fetching org repos')
+    repos = get_all(org['repo_url'], **source)
+
+    for repo in repos:
+        if repo['name'] in pipelines:
+            continue
+
+        if buildfile_exists(repo, **source):
+            print(f'Creating pipeline for {repo["name"]}')
+            fly_login(**source)
+            fly_set_pipeline(repo, **source)
+
+    timestamps = sorted(set(map(pushed_at, repos)))
+
+    return timestamps[-1], {}
+
+
+def buildfile_exists(repo, **kwargs):
+    url = repo['contents_url'].replace('{+path}', 'Jenkinsfile')
+    return github_api_request(url, **kwargs).status_code != 404
+
+
+def fly_login(**source):
+    subprocess.run(
+        f'{fly} -t dev login -u {username} -p {password} -n {team_name}',
+        check=True)
+
+def fly_set_pipeline(repo, **kwargs):
+    subprocess.run(
+        f'{fly} -t dev set-pipeline -p {repo} -c pipeline.yaml -n',
+        check=True)

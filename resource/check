@@ -1,31 +1,13 @@
-#!/bin/sh
+#!/usr/bin/env python
 
-set -e
-set -o pipefail
+from moj_anlytics.concourse import Resource
 
-exec 3>&1 # make stdout available as fd 3 for the result
-exec 1>&2 # redirect all output to stderr for logging
+from common import get_all, get_org, pushed_at
 
-# read inputs
-payload=$(mktemp request.XXXXXX)
-cat > $payload <&0
 
-# parse parameters
-GITHUB_ACCESS_TOKEN=$(jq -r '.source.access_token' < $payload)
-name=$(jq -r '.source.name // ""' < $payload)
-SKIP_SSL_VERIFICATION=$(jq -r '.source.skip_ssl_verification // false' < $payload)
-
-version=$(jq -r '.version.ref | fromdateiso8601' < $payload)
-
-source /opt/resource/common.sh
-
-org=$(mktemp org.XXXXXX)
-repos=$(mktemp repos.XXXXXX)
-
-get_org $name > $org
-
-repos_url="$(jq -r '.repos_url' < $org)?per_page=100"
-
-get_all $repos_url > $repos
-
-jq -r 'map(.pushed_at | fromdateiso8601) | sort | select(. >= '$version') | map({ref:.})' <$repos >&3
+@Resource
+def get_versions(source={}, version=None):
+    org = get_org(**source)
+    repos = get_all(org['repos_url'], **source)
+    timestamps = sorted(set(map(pushed_at, repos)))
+    return [{'ref': ts} for ts in timestamps if ts >= version]

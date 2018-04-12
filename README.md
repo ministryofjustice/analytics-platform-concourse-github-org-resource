@@ -1,6 +1,6 @@
 # Github Organization Resource
 
-Provides a Concourse resource to retrieve a Github Organization. Used to create
+Provides a Concourse resource for Github Organizations. Used to create
 pipelines for org repos when deploying a webapp on the Analytical Platform
 
 ## Resource configuration
@@ -11,11 +11,17 @@ These parameters go into the `source` fields of the resource type. Bold items ar
 | --------- | ----------- |
 | **`access_token`** | Github access token |
 | **`name`** | Name of the Github organization |
+| **`username`** | Concourse basic auth username |
+| **`password`** | Concourse basic auth password |
+| **`team_name`** | Concourse team name |
 | `skip_ssl_verification` | Whether curl should verify SSL certificates.  (Default `false`) |
 
 # Behaviour
 
-### `check`: Not Supported
+### `check`: Fetch Organization versions
+
+A version corresponds to the timestamp of the last push to any of the org's
+repositories.
 
 ### `in`: Fetch Organization
 
@@ -24,7 +30,10 @@ Retrieves the
 into the `org` file and a list of
 [repositories](https://developer.github.com/v3/repos/#get) in the `repos` file.
 
-### `out`: Not Supported
+### `out`: Create pipelines for any Org repos that want one
+
+Creates pipelines for any repo for which their does not already exist a pipeline
+with the same name, and which contains a `Jenkinsfile` (for now).
 
 ## Installation
 
