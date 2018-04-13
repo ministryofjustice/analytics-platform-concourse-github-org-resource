@@ -23,4 +23,4 @@ def get_org_repos(dest_dir, source={}, version=None, params={}):
 
     timestamps = sorted(set(map(pushed_at, repos)))
 
-    return timestamps[-1], {}
+    return {'version': {'ref': timestamps[-1]}}

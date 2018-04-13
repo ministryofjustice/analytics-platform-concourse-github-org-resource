@@ -31,7 +31,7 @@ def create_pipelines(src_dir, source={}, params={}):
 
     timestamps = sorted(set(map(pushed_at, repos)))
 
-    return timestamps[-1], {}
+    return {'version': {'ref': timestamps[-1]}}
 
 
 def buildfile_exists(repo, **kwargs):
