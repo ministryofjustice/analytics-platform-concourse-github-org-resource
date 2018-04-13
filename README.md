@@ -11,6 +11,7 @@ These parameters go into the `source` fields of the resource type. Bold items ar
 | --------- | ----------- |
 | **`access_token`** | Github access token |
 | **`name`** | Name of the Github organization |
+| **`concourse_url`** | Base URL of the Concourse API, eg: `https://concourse.example.com` |
 | **`username`** | Concourse basic auth username |
 | **`password`** | Concourse basic auth password |
 | **`team_name`** | Concourse team name |

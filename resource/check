@@ -11,3 +11,7 @@ def get_versions(source={}, version=None):
     repos = get_all(org['repos_url'], **source)
     timestamps = sorted(set(map(pushed_at, repos)))
     return [{'ref': ts} for ts in timestamps if ts >= version]
+
+
+if __name__ == '__main__':
+    get_versions()
