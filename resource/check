@@ -1,16 +1,25 @@
 #!/usr/bin/env python
 
-from moj_anlytics.concourse import Resource
+from moj_analytics.concourse import Resource
 
 from common import get_all, get_org, pushed_at
 
 
 @Resource
 def get_versions(source={}, version=None):
+    print(f'Fetching {source["name"]} org', flush=True)
     org = get_org(**source)
+
+    print('Fetching org repos', flush=True)
     repos = get_all(org['repos_url'], **source)
+
     timestamps = sorted(set(map(pushed_at, repos)))
-    return [{'ref': ts} for ts in timestamps if ts >= version]
+
+    if version is not None and version.get('ref') != 'none':
+        version = int(version['ref'])
+        timestamps = filter(lambda ts: ts >= version, timestamps)
+
+    return [{'ref': str(ts)} for ts in timestamps]
 
 
 if __name__ == '__main__':

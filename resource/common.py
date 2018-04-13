@@ -40,12 +40,14 @@ def update_query_params(url, **kwargs):
     'http://example.com?foo=1'
     >>> update_query_params('http://example.com?foo=1', foo=2)
     'http://example.com?foo=2'
+    >>> update_query_params('http://example.com?foo=1&foo=2', bar=3)
+    'http://example.com?foo=1&foo=2&bar=3'
     """
     QUERY = 4
     url_parts = list(urlparse(url))
     query_params = parse_qs(url_parts[QUERY])
     query_params.update(kwargs)
-    url_parts[QUERY] = urlencode(query_params)
+    url_parts[QUERY] = urlencode(query_params, doseq=True)
     return urlunparse(url_parts)
 
 
@@ -53,22 +55,24 @@ def parse_links(s):
     """
     Parse URLs from Link header
 
-    >>> parse_links(
-    >>>     '<https://api.github.com/resource?page=2; rel="next", '
-    >>>     '<https://api.github.com/resource?page=5; rel="last')
-    {
-        'next': 'https://api.github.com/resource?page=2',
-        'last': 'https://api.github.com/resource?page=5'
-    }
+    >>> links = parse_links(
+    ...     '<https://api.github.com/repos?page=2>; rel="next", '
+    ...     '<https://api.github.com/repos?page=5>; rel="last"')
+    >>> list(links.keys())
+    ['next', 'last']
+    >>> links['next']
+    'https://api.github.com/repos?page=2'
+    >>> links['last']
+    'https://api.github.com/repos?page=5'
     """
     links = {}
     for link in s.split(','):
-        url, rel = link.strip().split('; ')
-        url = url[1:-1]
-        rel = rel[5:-1]
+        url, rel = link.strip().split(';')
+        url = url.strip(' <>')
+        rel = rel.strip().replace('rel=', '').strip('"')
         links[rel] = url
     return links
 
 
 def pushed_at(r):
-    return parse(r['pushed_at']).replace(tzinfo=timezone.utc).timestamp()
+    return int(parse(r['pushed_at']).replace(tzinfo=timezone.utc).timestamp())

@@ -2,6 +2,7 @@
 
 from os.path import join
 import json
+import sys
 
 from moj_analytics.concourse import Resource
 
@@ -10,21 +11,21 @@ from common import get_all, get_org, pushed_at
 
 @Resource
 def get_org_repos(dest_dir, source={}, version=None, params={}):
-    print(f'Fetching {source["name"]} org')
+    print(f'Fetching {source["name"]} org', flush=True)
     org = get_org(**source)
     with open(join(dest_dir, 'org'), 'w') as org_file:
         json.dump(org, org_file)
 
-    print('Fetching org repos')
+    print('Fetching org repos', flush=True)
     repos = get_all(org['repos_url'], **source)
     with open(join(dest_dir, 'repos'), 'w') as repos_file:
         json.dump(repos, repos_file)
 
-    print(f'{len(repos)} repos found')
+    print(f'{len(repos)} repos found', flush=True)
 
     timestamps = sorted(set(map(pushed_at, repos)))
 
-    return {'version': {'ref': timestamps[-1]}}
+    return {'version': {'ref': str(timestamps[-1])}}
 
 
 if __name__ == '__main__':
