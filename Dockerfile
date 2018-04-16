@@ -13,5 +13,3 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY moj_analytics /usr/local/lib/python3.6/site-packages/moj_analytics
 COPY resource /opt/resource
 RUN chmod +x /opt/resource/*
-
-COPY pipeline.yaml ./
