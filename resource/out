@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from base64 import b64decode
 import subprocess
 
 from moj_analytics.concourse import Resource
@@ -80,8 +81,11 @@ def buildfile_exists(repo, **kwargs):
 def fly_login(concourse_url, username, password, team_name, **source):
     subprocess.run(
         [
-            fly, '-t', 'dev', 'login', '-c', concourse_url, '-u', username,
-            '-p', password, '-n', team_name
+            fly, '-t', 'dev', 'login',
+            '-c', concourse_url,
+            '-u', username,
+            '-p', password,
+            '-n', team_name
         ],
         stdout=subprocess.PIPE,
         check=True)
@@ -90,8 +94,15 @@ def fly_login(concourse_url, username, password, team_name, **source):
 def fly_set_pipeline(repo, team_name, **kwargs):
     subprocess.run(
         [
-            fly, '-t', 'dev', 'set-pipeline', '-p', repo["name"],
-            '-c', '/opt/resource/pipeline.yaml', '-n', team_name
+            fly, '-t', 'dev', 'set-pipeline',
+            '-p', repo["name"],
+            '-c', '/opt/resource/pipeline.yaml',
+            '-n', team_name,
+            '-v', f'app-name={repo["name"]}',
+            '-v', f'github-org={kwargs["name"]}',
+            '-v', f'cookie-secret={kwargs["cookie-secret"]}',
+            '-v', f'cluster-ca={kwargs["cluster-ca"]}',
+            '-v', f'token={kwargs["token"]}'
         ],
         stdout=subprocess.PIPE,
         check=True)

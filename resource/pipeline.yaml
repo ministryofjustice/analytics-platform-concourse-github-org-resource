@@ -1,0 +1,131 @@
+---
+jobs:
+- name: deploy-webapp
+  plan:
+
+  - get: release
+    trigger: true
+    params:
+      include_source_tarball: true
+
+  - task: extract
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source:
+          repository: busybox
+      inputs:
+      - name: release
+      outputs:
+      - name: webapp-source
+      run:
+        path: tar
+        args: ['zxf', 'release/source.tar.gz', '-C', 'webapp-source/', '--strip-components', '1']
+
+  - put: webapp-docker-repo
+
+  - task: webapp-docker-image
+    privileged: true
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source: {'repository': 'concourse/docker-image-resource'}
+      inputs:
+      - name: release
+      - name: webapp-docker-repo
+      - name: webapp-source
+      outputs:
+      - name: webapp-docker-image
+      params:
+        AWS_ACCESS_KEY_ID: ((ecr-access-key-id))
+        AWS_SECRET_ACCESS_KEY: ((ecr-secret-access-key))
+      run:
+        path: sh
+        args:
+          - -ec
+          - |
+            jq -n "{
+              source: {
+                repository: \"$(cat webapp-docker-repo/uri)\",
+                aws_access_key_id: \"${AWS_ACCESS_KEY_ID}\",
+                aws_secret_access_key: \"${AWS_SECRET_ACCESS_KEY}\"
+              },
+              params: {
+                build: \"$(pwd)/webapp-source\",
+                tag: \"$(pwd)/release/tag\"
+              }
+            }" | /opt/resource/out webapp-docker-image
+
+  - put: webapp-auth0-client
+
+  - put: webapp-helm-release
+    params:
+      chart: mojanalytics/webapp
+      values:
+      - webapp-auth0-client/credentials.yaml
+      override_values:
+      - { key: WebApp.Name, value: ((app-name)) }
+      - { key: WebApp.BaseHost, value: ((app-domain)) }
+      - { key: WebApp.Image.Repository, path: webapp-docker-repo/uri }
+      - { key: WebApp.Image.Tag, path: release/tag }
+      - { key: WebApp.GithubRepo, value: ((app-name)) }
+      - { key: CookieSecret, value: ((cookie-secret)) }
+
+resources:
+- name: release
+  type: github-release
+  source:
+    owner: ((github-org))
+    repository: ((app-name))
+    access_token: ((github-access-token))
+
+- name: webapp-auth0-client
+  type: auth0-client
+  source:
+    app-name: ((app-name))
+    app-domain: ((app-domain))
+    client-id: ((auth0-client-id))
+    client-secret: ((auth0-client-secret))
+    domain: ((auth0-domain))
+    authz-url: ((auth0-authz-url))
+    authz-audience: ((auth0-authz-audience))
+
+- name: webapp-docker-repo
+  type: ecr-repo
+  source:
+    name: ((app-name))
+    region: ((aws-region))
+
+- name: webapp-helm-release
+  type: helm
+  source:
+    cluster_url: https://api.((env)).mojanalytics.xyz
+    cluster_ca: ((cluster-ca))
+    helm_host: tiller-deploy.kube-system:44134
+    token: ((token))
+    namespace: apps-prod
+    release: ((app-name))
+    repos:
+    - name: mojanalytics
+      url: https://ministryofjustice.github.io/analytics-platform-helm-charts/charts
+
+resource_types:
+- name: auth0-client
+  type: docker-image
+  source:
+    repository: quay.io/mojanalytics/concourse-auth0-resource
+    tag: v0.1.0
+
+- name: ecr-repo
+  type: docker-image
+  source:
+    repository: quay.io/mojanalytics/concourse-ecr-resource
+    tag: v0.1.0
+
+- name: helm
+  type: docker-image
+  source:
+    repository: quay.io/mojanalytics/concourse-helm-resource
+    tag: 0.1.9

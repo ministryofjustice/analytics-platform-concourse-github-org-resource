@@ -15,6 +15,9 @@ These parameters go into the `source` fields of the resource type. Bold items ar
 | **`username`** | Concourse basic auth username |
 | **`password`** | Concourse basic auth password |
 | **`team_name`** | Concourse team name |
+| **`cookie-secret`** | Secret used to encrypt deployed webapp session cookies |
+| **`cluster-ca`** | Base64 encoded PEM |
+| **`token`** | Bearer token for Kubernetes |
 | `skip_ssl_verification` | Whether curl should verify SSL certificates.  (Default `false`) |
 
 # Behaviour
@@ -54,6 +57,13 @@ resources:
   source:
     name: moj-analytical-services
     access_token: ((github-access-token))
+    concourse_url: ((concourse-url))
+    username: ((concourse-username))
+    password: ((concourse-password))
+    team_name: ((concourse-team-name))
+    cookie-secret: ((cookie-secret))
+    cluster-ca: ((cluster-ca))
+    token: ((token))
 
 jobs:
 - name: deploy
