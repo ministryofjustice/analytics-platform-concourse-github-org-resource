@@ -8,55 +8,19 @@ jobs:
     params:
       include_source_tarball: true
 
-  - task: extract
-    config:
-      platform: linux
-      image_resource:
-        type: docker-image
-        source:
-          repository: busybox
-      inputs:
-      - name: release
-      outputs:
-      - name: webapp-source
-      run:
-        path: tar
-        args: ['zxf', 'release/source.tar.gz', '-C', 'webapp-source/', '--strip-components', '1']
+  - get: common-tasks
+
+  - task: webapp-source
+    file: common-tasks/extract-release-tarball.yaml
 
   - put: webapp-docker-repo
 
   - task: webapp-docker-image
     privileged: true
-    config:
-      platform: linux
-      image_resource:
-        type: docker-image
-        source: {'repository': 'concourse/docker-image-resource'}
-      inputs:
-      - name: release
-      - name: webapp-docker-repo
-      - name: webapp-source
-      outputs:
-      - name: webapp-docker-image
-      params:
-        AWS_ACCESS_KEY_ID: ((ecr-access-key-id))
-        AWS_SECRET_ACCESS_KEY: ((ecr-secret-access-key))
-      run:
-        path: sh
-        args:
-          - -ec
-          - |
-            jq -n "{
-              source: {
-                repository: \"$(cat webapp-docker-repo/uri)\",
-                aws_access_key_id: \"${AWS_ACCESS_KEY_ID}\",
-                aws_secret_access_key: \"${AWS_SECRET_ACCESS_KEY}\"
-              },
-              params: {
-                build: \"$(pwd)/webapp-source\",
-                tag: \"$(pwd)/release/tag\"
-              }
-            }" | /opt/resource/out webapp-docker-image
+    file: common-tasks/webapp-docker-image.yaml
+    params:
+      AWS_ACCESS_KEY_ID: ((ecr-access-key-id))
+      AWS_SECRET_ACCESS_KEY: ((ecr-secret-access-key))
 
   - put: webapp-auth0-client
 
@@ -74,6 +38,11 @@ jobs:
       - { key: CookieSecret, value: ((cookie-secret)) }
 
 resources:
+- name: common-tasks
+  type: git
+  source:
+    uri: https://github.com/ministryofjustice/analytics-platform-common-concourse-tasks.git
+
 - name: release
   type: github-release
   source:
@@ -101,7 +70,7 @@ resources:
 - name: webapp-helm-release
   type: helm
   source:
-    cluster_url: https://api.((env)).mojanalytics.xyz
+    cluster_url: ((cluster-url))
     cluster_ca: ((cluster-ca))
     helm_host: tiller-deploy.kube-system:44134
     token: ((token))
