@@ -1,6 +1,6 @@
 ---
 jobs:
-- name: deploy-webapp
+- name: deploy
   plan:
 
   - get: release
@@ -19,8 +19,8 @@ jobs:
     privileged: true
     file: common-tasks/webapp-docker-image.yaml
     params:
-      AWS_ACCESS_KEY_ID: ((ecr-access-key-id))
-      AWS_SECRET_ACCESS_KEY: ((ecr-secret-access-key))
+      AWS_ACCESS_KEY_ID: ((secrets.ecr-access-key-id))
+      AWS_SECRET_ACCESS_KEY: ((secrets.ecr-secret-access-key))
 
   - put: webapp-auth0-client
 
@@ -31,11 +31,11 @@ jobs:
       - webapp-auth0-client/credentials.yaml
       override_values:
       - { key: WebApp.Name, value: ((app-name)) }
-      - { key: WebApp.BaseHost, value: ((app-domain)) }
+      - { key: WebApp.BaseHost, value: ((secrets.app-domain)) }
       - { key: WebApp.Image.Repository, path: webapp-docker-repo/uri }
       - { key: WebApp.Image.Tag, path: release/tag }
       - { key: WebApp.GithubRepo, value: ((app-name)) }
-      - { key: CookieSecret, value: ((cookie-secret)) }
+      - { key: CookieSecret, value: ((secrets.cookie-secret)) }
 
 resources:
 - name: common-tasks
@@ -48,32 +48,32 @@ resources:
   source:
     owner: ((github-org))
     repository: ((app-name))
-    access_token: ((github-access-token))
+    access_token: ((secrets.github-access-token))
 
 - name: webapp-auth0-client
   type: auth0-client
   source:
     app-name: ((app-name))
-    app-domain: ((app-domain))
-    client-id: ((auth0-client-id))
-    client-secret: ((auth0-client-secret))
-    domain: ((auth0-domain))
-    authz-url: ((auth0-authz-url))
-    authz-audience: ((auth0-authz-audience))
+    app-domain: ((secrets.app-domain))
+    client-id: ((secrets.auth0-client-id))
+    client-secret: ((secrets.auth0-client-secret))
+    domain: ((secrets.auth0-domain))
+    authz-url: ((secrets.auth0-authz-url))
+    authz-audience: ((secrets.auth0-authz-audience))
 
 - name: webapp-docker-repo
   type: ecr-repo
   source:
     name: ((app-name))
-    region: ((aws-region))
+    region: ((secrets.aws-region))
 
 - name: webapp-helm-release
   type: helm
   source:
-    cluster_url: ((cluster-url))
-    cluster_ca: ((cluster-ca))
+    cluster_url: ((secrets.kubernetes-api-url))
+    cluster_ca: ((secrets.kubernetes-ca-cert))
     helm_host: tiller-deploy.kube-system:44134
-    token: ((token))
+    token: ((secrets.kubernetes-token))
     namespace: apps-prod
     release: ((app-name))
     repos:

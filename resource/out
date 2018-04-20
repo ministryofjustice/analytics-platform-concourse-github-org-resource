@@ -111,11 +111,7 @@ def fly_set_pipeline(repo, team_name, **kwargs):
             '-c', '/opt/resource/pipeline.yaml',
             '-n', team_name,
             '-v', f'app-name={repo["name"]}',
-            '-v', f'github-access-token={kwargs["access_token"]}',
-            '-v', f'github-org={kwargs["name"]}',
-            '-v', f'cookie-secret={kwargs["cookie-secret"]}',
-            '-v', f'cluster-ca={kwargs["cluster-ca"]}',
-            '-v', f'token={kwargs["token"]}'
+            '-v', f'github-org={kwargs["name"]}'
         ],
         stdout=subprocess.PIPE,
         check=True)
