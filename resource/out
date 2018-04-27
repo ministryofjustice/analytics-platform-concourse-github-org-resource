@@ -76,7 +76,7 @@ def get_pipelines(concourse_url, team_name, **kwargs):
 
 
 def buildfile_exists(repo, **kwargs):
-    url = repo['contents_url'].replace('{+path}', 'Jenkinsfile')
+    url = repo['contents_url'].replace('{+path}', 'deploy.json')
     return github_api_request(url, **kwargs).status_code != 404
 
 
