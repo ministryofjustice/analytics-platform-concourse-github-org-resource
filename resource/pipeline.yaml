@@ -13,6 +13,13 @@ jobs:
   - task: webapp-source
     file: common-tasks/extract-release-tarball.yaml
 
+  - task: deploy-params
+    file: common-tasks/parse-deploy-file.yaml
+    params:
+      IPS_DOM1: ((secrets.ip-dom1))
+      IPS_QUANTUM: ((secrets.ip-quantum))
+      IPS_102PF_WIFI: ((secrets.ip-102pf))
+
   - put: webapp-docker-repo
 
   - task: webapp-docker-image
@@ -29,6 +36,7 @@ jobs:
       chart: mojanalytics/webapp
       values:
       - webapp-auth0-client/credentials.yaml
+      - deploy-params/overrides.yaml
       override_values:
       - { key: WebApp.Name, value: ((app-name)) }
       - { key: WebApp.BaseHost, value: ((secrets.app-domain)) }
