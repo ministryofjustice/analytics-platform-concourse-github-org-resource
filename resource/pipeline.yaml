@@ -12,6 +12,7 @@ jobs:
 
   - task: webapp-source
     file: common-tasks/extract-release-tarball.yaml
+    output_mapping: {extracted: webapp-source}
 
   - task: deploy-params
     file: common-tasks/parse-deploy-file.yaml
