@@ -2,6 +2,7 @@
 
 from base64 import b64decode
 import os
+import re
 import subprocess
 
 from moj_analytics.concourse import Resource
@@ -12,6 +13,9 @@ from common import get_all, get_org, github_api_request, pushed_at
 
 
 fly = '/usr/local/bin/fly'
+
+INVALID_CHARS = re.compile(r'[^-a-z0-9]')
+SURROUNDING_HYPHENS = re.compile(r'^-*|-*$')
 
 
 class ansi:
@@ -104,17 +108,24 @@ def fly_login(concourse_url, username, password, team_name, **source):
 
 
 def fly_set_pipeline(repo, team_name, **kwargs):
+    app_name = normalize(repo['name'])
     subprocess.run(
         [
             fly, '-t', 'default', 'set-pipeline',
             '-p', repo["name"],
             '-c', '/opt/resource/pipeline.yaml',
             '-n', team_name,
-            '-v', f'app-name={repo["name"]}',
+            '-v', f'app-name={app_name}',
             '-v', f'github-org={kwargs["name"]}'
         ],
         stdout=subprocess.PIPE,
         check=True)
+
+
+def normalize(name):
+    name = name.lower()
+    name = SURROUNDING_HYPHENS.sub('', INVALID_CHARS.sub('-', name))
+    return name[:50]
 
 
 if __name__ == '__main__':
