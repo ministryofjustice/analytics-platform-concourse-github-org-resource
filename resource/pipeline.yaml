@@ -43,7 +43,7 @@ jobs:
       - { key: WebApp.BaseHost, value: ((secrets.app-domain)) }
       - { key: WebApp.Image.Repository, path: webapp-docker-repo/uri }
       - { key: WebApp.Image.Tag, path: release/tag }
-      - { key: WebApp.GithubRepo, value: ((app-name)) }
+      - { key: WebApp.GithubRepo, value: ((github-repo)) }
       - { key: CookieSecret, value: ((secrets.cookie-secret)) }
 
 resources:
@@ -56,7 +56,7 @@ resources:
   type: github-release
   source:
     owner: ((github-org))
-    repository: ((app-name))
+    repository: ((github-repo))
     access_token: ((secrets.github-access-token))
 
 - name: webapp-auth0-client

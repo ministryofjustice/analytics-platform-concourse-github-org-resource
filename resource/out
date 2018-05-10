@@ -116,7 +116,8 @@ def fly_set_pipeline(repo, team_name, **kwargs):
             '-c', '/opt/resource/pipeline.yaml',
             '-n', team_name,
             '-v', f'app-name={app_name}',
-            '-v', f'github-org={kwargs["name"]}'
+            '-v', f'github-org={kwargs["name"]}',
+            '-v', f'github-repo={repo["name"]}'
         ],
         stdout=subprocess.PIPE,
         check=True)
