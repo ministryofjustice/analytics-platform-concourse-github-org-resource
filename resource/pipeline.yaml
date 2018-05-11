@@ -32,6 +32,13 @@ jobs:
 
   - put: webapp-auth0-client
 
+  - task: iam-role-name
+    file: common-tasks/get-iam-role.yaml
+    output_mapping: {output: aws}
+    params:
+      APP_NAME: ((app-name))
+      CPANEL_API_URL: ((secrets.cpanel-api-url))
+
   - put: webapp-helm-release
     params:
       chart: mojanalytics/webapp
@@ -41,9 +48,10 @@ jobs:
       override_values:
       - { key: WebApp.Name, value: ((app-name)) }
       - { key: WebApp.BaseHost, value: ((secrets.app-domain)) }
+      - { key: WebApp.GithubRepo, value: ((github-repo)) }
       - { key: WebApp.Image.Repository, path: webapp-docker-repo/uri }
       - { key: WebApp.Image.Tag, path: release/tag }
-      - { key: WebApp.GithubRepo, value: ((github-repo)) }
+      - { key: AWS.IAMRole, path: aws/iam_role_name }
       - { key: CookieSecret, value: ((secrets.cookie-secret)) }
 
 resources:
