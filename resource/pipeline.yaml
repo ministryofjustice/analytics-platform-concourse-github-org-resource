@@ -36,7 +36,8 @@ jobs:
     file: common-tasks/get-iam-role.yaml
     output_mapping: {output: aws}
     params:
-      APP_NAME: ((app-name))
+      ORG_NAME: ((github-org))
+      REPO_NAME: ((github-repo))
       CPANEL_API_URL: ((secrets.cpanel-api-url))
 
   - put: webapp-helm-release
