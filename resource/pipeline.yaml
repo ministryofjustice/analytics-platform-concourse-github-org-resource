@@ -38,7 +38,9 @@ jobs:
     params:
       ORG_NAME: ((github-org))
       REPO_NAME: ((github-repo))
+      CPANEL_API_PASSWORD: ((secrets.cpanel-api-password))
       CPANEL_API_URL: ((secrets.cpanel-api-url))
+      CPANEL_API_USER: ((secrets.cpanel-api-user))
 
   - put: webapp-helm-release
     params:
