@@ -98,7 +98,7 @@ resources:
     release: ((app-name))
     repos:
     - name: mojanalytics
-      url: https://ministryofjustice.github.io/analytics-platform-helm-charts/charts
+      url: http://moj-analytics-helm-repo.s3-website-eu-west-1.amazonaws.com
 
 resource_types:
 - name: auth0-client
