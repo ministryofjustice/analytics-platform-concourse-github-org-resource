@@ -116,5 +116,5 @@ resource_types:
 - name: helm
   type: docker-image
   source:
-    repository: quay.io/mojanalytics/concourse-helm-resource
-    tag: 0.1.9
+    repository: linkyard/concourse-helm-resource
+    tag: 2.9.1-3
