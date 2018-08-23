@@ -1,0 +1,78 @@
+---
+jobs:
+- name: deploy
+  plan:
+
+  - get: release
+    trigger: true
+    params:
+      include_source_tarball: true
+
+  - get: common-tasks
+
+  - task: dag-source
+    file: common-tasks/extract-release-tarball.yaml
+    output_mapping: {extracted: dag-source}
+
+  - task: deploy-params
+    file: common-tasks/parse-deploy-file.yaml
+    input_mapping: {webapp-source: dag-source}
+    params:
+      IPS_DOM1: ((secrets.ip-dom1))
+      IPS_QUANTUM: ((secrets.ip-quantum))
+      IPS_102PF_WIFI: ((secrets.ip-102pf))
+
+  - put: dag-docker-repo
+
+  - task: dag-docker-image
+    privileged: true
+    file: common-tasks/webapp-docker-image.yaml
+    input_mapping:
+      webapp-docker-repo: dag-docker-repo
+      webapp-source: dag-source
+    params:
+      AWS_ACCESS_KEY_ID: ((secrets.ecr-access-key-id))
+      AWS_SECRET_ACCESS_KEY: ((secrets.ecr-secret-access-key))
+
+  - task: create-iam-role-name
+    file: common-tasks/put-iam-role.yaml
+
+    output_mapping: {output: aws}
+    input_mapping:
+      source: dag-source
+
+    params:
+      ORG_NAME: ((github-org))
+      REPO_NAME: ((github-repo))
+      AWS_ACCESS_KEY_ID: ((secrets.role-putter-access-key-id))
+      AWS_SECRET_ACCESS_KEY: ((secrets.role-putter-secret-access-key))
+      AWS_NODES_ROLE_ARN: ((secrets.nodes-role-arn))
+      APP_NAME: ((app-name))
+
+resources:
+- name: common-tasks
+  type: git
+  source:
+    uri: https://github.com/ministryofjustice/analytics-platform-common-concourse-tasks.git
+
+- name: release
+  type: github-release
+  source:
+    owner: ((github-org))
+    repository: ((github-repo))
+    access_token: ((secrets.github-access-token))
+
+- name: dag-docker-repo
+  type: ecr-repo
+  source:
+    name: ((app-name))
+    region: ((secrets.aws-region))
+    access_key_id: ((secrets.ecr-access-key-id))
+    secret_access_key: ((secrets.ecr-secret-access-key))
+
+resource_types:
+- name: ecr-repo
+  type: docker-image
+  source:
+    repository: quay.io/mojanalytics/concourse-ecr-resource
+    tag: v0.1.0
