@@ -2,7 +2,6 @@
 
 from os.path import join
 import json
-import sys
 
 from moj_analytics.concourse import Resource
 
