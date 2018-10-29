@@ -42,11 +42,14 @@ jobs:
       CPANEL_API_URL: ((secrets.cpanel-api-url))
       CPANEL_API_USER: ((secrets.cpanel-api-user))
 
+  - get: config-repo
+
   - put: webapp-helm-release
     params:
       chart: mojanalytics/webapp
       values:
       - webapp-auth0-client/credentials.yaml
+      - helm-config/chart-env-config/alpha/webapp.yml
       - deploy-params/overrides.yaml
       override_values:
       - { key: WebApp.Name, value: ((app-name)) }
@@ -58,6 +61,12 @@ jobs:
       - { key: CookieSecret, value: ((secrets.cookie-secret)) }
 
 resources:
+- name: config-repo
+  type: git
+  source:
+    uri: https://github.com/ministryofjustice/analytics-platform-config.git
+    git_crypt_key: ((secrets.gitcrypt-symmetric-key))
+
 - name: common-tasks
   type: git
   source:
