@@ -78,6 +78,7 @@ resources:
     owner: ((github-org))
     repository: ((github-repo))
     access_token: ((secrets.github-access-token))
+  check_every: 2m
 
 - name: webapp-auth0-client
   type: auth0-client
