@@ -49,7 +49,7 @@ jobs:
       chart: mojanalytics/webapp
       values:
       - webapp-auth0-client/credentials.yaml
-      - helm-config/chart-env-config/alpha/webapp.yml
+      - config-repo/chart-env-config/alpha/webapp.yml
       - deploy-params/overrides.yaml
       override_values:
       - { key: WebApp.Name, value: ((app-name)) }
