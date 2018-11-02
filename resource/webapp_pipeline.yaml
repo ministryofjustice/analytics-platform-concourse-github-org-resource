@@ -74,6 +74,8 @@ resources:
 
 - name: release
   type: github-release
+  webhook_token: ((secrets.github-webhook-token))
+  check_every: 24h
   source:
     owner: ((github-org))
     repository: ((github-repo))
