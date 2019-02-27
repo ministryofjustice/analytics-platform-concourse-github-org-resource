@@ -5,8 +5,6 @@ import json
 
 from fly import Fly
 from moj_analytics.concourse import Resource
-import requests
-import yaml
 
 from common import get_all, get_org, github_api_request, pushed_at
 
@@ -71,19 +69,6 @@ def create_pipelines(src_dir, source={}, params={}):
     timestamps = sorted(set(map(pushed_at, repos)))
 
     return {'version': {'ref': str(timestamps[-1])}}
-
-
-def get_pipelines(concourse_url, team_name, **kwargs):
-    with open('/root/.flyrc') as f:
-        fly_config = yaml.load(f.read())
-    token = fly_config['targets']['default']['token']['value']
-
-    url = f'{concourse_url}/api/v1/teams/{team_name}/pipelines'
-    headers = {
-        'Cookie': f'ATC-Authorization="Bearer {token}"',
-    }
-    pipelines = requests.get(url, headers=headers).json()
-    return [p['name'] for p in pipelines]
 
 
 def buildfile_exists(repo, **kwargs):
