@@ -14,25 +14,6 @@ jobs:
     file: common-tasks/extract-release-tarball.yaml
     output_mapping: {extracted: lookup-source}
 
-  - get: iam-policy
-
-  - task: create-iam-role-name
-      file: common-tasks/put-iam-role.yaml
-
-      output_mapping: {output: aws}
-      input_mapping:
-        source: iam-policy
-
-      params:
-        ORG_NAME: ((github-org))
-        REPO_NAME: ((github-repo))
-        AWS_ACCESS_KEY_ID: ((secrets.role-putter-access-key-id))
-        AWS_SECRET_ACCESS_KEY: ((secrets.role-putter-secret-access-key))
-        AWS_NODES_ROLE_ARN: ((secrets.nodes-role-arn))
-        APP_NAME: ((app-name))
-
-  - get: config-repo
-
   - task: run-lookup-etl
     config:
       platform: linux
@@ -46,25 +27,14 @@ jobs:
         args:
           - etl/run.py
       params:
-        AWS_ACCESS_KEY_ID: ((lookup-access-key-id))
-        AWS_SECRET_ACCESS_KEY: ((lookup-secret-access-key))
+        AWS_ACCESS_KEY_ID: ((secrets.lookup-access-key-id))
+        AWS_SECRET_ACCESS_KEY: ((secrets.lookup-secret-access-key))
 
 resources:
-  - name: config-repo
-    type: git
-    source:
-      uri: https://github.com/ministryofjustice/analytics-platform-config.git
-      git_crypt_key: ((secrets.gitcrypt-symmetric-key))
-
 - name: common-tasks
   type: git
   source:
     uri: https://github.com/ministryofjustice/analytics-platform-common-concourse-tasks.git
-
-- name: iam-policy
-  type: git
-  source:
-    uri: https://github.com/moj-analytical-services/docker-lookup-tables.git
 
 - name: release
   type: github-release
