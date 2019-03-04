@@ -1,18 +1,13 @@
 #!/usr/bin/env python
 
-import os
 import re
-import subprocess
 import json
 
+from fly import Fly
 from moj_analytics.concourse import Resource
-import requests
-import yaml
 
 from common import get_all, get_org, github_api_request, pushed_at
 
-
-fly = '/usr/local/bin/fly'
 
 INVALID_CHARS = re.compile(r'[^-a-z0-9]')
 SURROUNDING_HYPHENS = re.compile(r'^-*|-*$')
@@ -27,11 +22,18 @@ class ansi:
 @Resource
 def create_pipelines(src_dir, source={}, params={}):
     print('Logging in to Concourse')
-    get_fly(**source)
-    fly_login(**source)
+    fly = Fly(
+        concourse_url=source.get('concourse_url')
+    )
+    fly.get_fly()
+    fly.login(
+        username=source.get('username'),
+        password=source.get('password'),
+        team_name=source.get('team_name')
+    )
 
     print('Fetching existing pipelines', flush=True)
-    pipelines = get_pipelines(**source)
+    pipelines = [p['name'] for p in fly.get_json('pipelines')]
     print(f'Found {len(pipelines)} pipelines', flush=True)
 
     print(f'Fetching {source["name"]} org', flush=True)
@@ -57,7 +59,7 @@ def create_pipelines(src_dir, source={}, params={}):
 
             pipeline_type = buildfile_type(repo, **source)
 
-            fly_set_pipeline(repo, pipeline_type=pipeline_type, **source)
+            fly_set_pipeline(fly, repo, pipeline_type=pipeline_type, **source)
 
         else:
             print(
@@ -67,19 +69,6 @@ def create_pipelines(src_dir, source={}, params={}):
     timestamps = sorted(set(map(pushed_at, repos)))
 
     return {'version': {'ref': str(timestamps[-1])}}
-
-
-def get_pipelines(concourse_url, team_name, **kwargs):
-    with open('/root/.flyrc') as f:
-        fly_config = yaml.load(f.read())
-    token = fly_config['targets']['default']['token']['value']
-
-    url = f'{concourse_url}/api/v1/teams/{team_name}/pipelines'
-    headers = {
-        'Cookie': f'ATC-Authorization="Bearer {token}"',
-    }
-    pipelines = requests.get(url, headers=headers).json()
-    return [p['name'] for p in pipelines]
 
 
 def buildfile_exists(repo, **kwargs):
@@ -101,44 +90,16 @@ def buildfile_type(repo, **kwargs):
     return deploy_type
 
 
-def get_fly(concourse_url, **kwargs):
-    url = f'{concourse_url}/api/v1/cli?arch=amd64&platform=linux'
-    response = requests.get(url, stream=True)
-    if response.status_code == 200:
-        with open(fly, 'wb') as f:
-            for chunk in response:
-                f.write(chunk)
-        os.chmod(fly, 0o755)  # make executable
-
-
-def fly_login(concourse_url, username, password, team_name, **source):
-    subprocess.run(
-        [
-            fly, '-t', 'default', 'login',
-            '-c', concourse_url,
-            '-u', username,
-            '-p', password,
-            '-n', team_name
-        ],
-        stdout=subprocess.PIPE,
-        check=True)
-
-
-def fly_set_pipeline(repo, team_name, pipeline_type='webapp', **kwargs):
+def fly_set_pipeline(fly, repo, team_name, pipeline_type='webapp', **kwargs):
     app_name = normalize(repo['name'])
-    subprocess.run(
-        [
-            fly, '-t', 'default', 'set-pipeline',
-            '-p', repo["name"],
-            '-c', f'/opt/resource/{pipeline_type}_pipeline.yaml',
-            '-v', f'app-name={app_name}',
-            '-v', f'github-org={kwargs["name"]}',
-            '-v', f'github-repo={repo["name"]}',
-            '-n'
-
-        ],
-        stdout=subprocess.PIPE,
-        check=True)
+    fly.run(
+        'set-pipeline',
+        '-p', repo["name"],
+        '-c', f'/opt/resource/{pipeline_type}_pipeline.yaml',
+        '-v', f'app-name={app_name}',
+        '-v', f'github-org={kwargs["name"]}',
+        '-v', f'github-repo={repo["name"]}',
+        '-n')
 
 
 def normalize(name):
