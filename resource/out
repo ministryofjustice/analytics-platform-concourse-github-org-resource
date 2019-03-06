@@ -33,7 +33,7 @@ def create_pipelines(src_dir, source={}, params={}):
     )
 
     print('Fetching existing pipelines', flush=True)
-    pipelines = [p['name'] for p in fly.get_json('pipelines')]
+    pipelines = get_pipelines(fly)
     print(f'Found {len(pipelines)} pipelines', flush=True)
 
     print(f'Fetching {source["name"]} org', flush=True)
@@ -69,6 +69,11 @@ def create_pipelines(src_dir, source={}, params={}):
     timestamps = sorted(set(map(pushed_at, repos)))
 
     return {'version': {'ref': str(timestamps[-1])}}
+
+
+def get_pipelines(fly):
+    return [str(p).split(' ')[0] for p in
+            fly.run('pipelines').stdout.decode('utf-8').splitlines()]
 
 
 def buildfile_exists(repo, **kwargs):
