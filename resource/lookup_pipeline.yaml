@@ -21,14 +21,15 @@ jobs:
         type: docker-image
         source:
           repository: quay.io/mojanalytics/lookup-tables-etl
-          tag: v0.0.1
+          tag: latest
       inputs:
         - name: lookup-source
       run:
         path: python
         args:
-          - etl/run.py
+          - /etl/run.py
       params:
+        SOURCE_DIR: /lookup-source
         AWS_ACCESS_KEY_ID: ((secrets.lookup-access-key-id))
         AWS_SECRET_ACCESS_KEY: ((secrets.lookup-secret-access-key))
 
