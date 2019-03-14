@@ -29,7 +29,7 @@ jobs:
         args:
           - /etl/run.py
       params:
-        SOURCE_DIR: /lookup-source
+        SOURCE_DIR: lookup-source
         AWS_ACCESS_KEY_ID: ((secrets.lookup-access-key-id))
         AWS_SECRET_ACCESS_KEY: ((secrets.lookup-secret-access-key))
 
