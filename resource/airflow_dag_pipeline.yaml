@@ -49,6 +49,103 @@ jobs:
       AWS_NODES_ROLE_ARN: ((secrets.nodes-role-arn))
       APP_NAME: ((app-name))
 
+- name: test
+  plan:
+  - get: pull-request
+    trigger: true
+    version: every
+
+  - get: common-tasks
+
+  # Update github 'checks' on PR
+  - aggregate:
+    - put: pull-request
+      params:
+        path: pull-request
+        status: pending
+        context: iam-role
+    - put: pull-request
+      params:
+        path: pull-request
+        status: pending
+        context: unittests
+
+  - aggregate:
+    - task: update-to-test-iam-role-name
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source:
+            repository: concourse/docker-image-resource
+        inputs:
+          - name: pull-request
+        run:
+          path: sh
+          args:
+            - -ecx
+            - |
+              cp -R ./pull-request/* ./pull-request-edit
+              jq '.role_name = "test_dag_role"' ./pull-request/deploy.json > ./pull-request-edit/deploy.json
+              cat ./pull-request-edit/deploy.json
+        outputs:
+          - name: pull-request-edit
+
+  # run the dag unit tests
+  - aggregate:
+    - task: create-iam-role-name
+      file: common-tasks/put-iam-role.yaml
+      output_mapping: {output: aws}
+      input_mapping:
+        source: pull-request-edit
+      params:
+        ORG_NAME: ((github-org))
+        REPO_NAME: ((github-repo))
+        AWS_ACCESS_KEY_ID: ((secrets.role-putter-access-key-id))
+        AWS_SECRET_ACCESS_KEY: ((secrets.role-putter-secret-access-key))
+        AWS_NODES_ROLE_ARN: ((secrets.nodes-role-arn))
+        APP_NAME: ((app-name))
+      on_failure:
+        put: pull-request
+        params:
+          path: pull-request
+          status: failure
+          context: iam-role
+    - put: pull-request
+      params:
+        path: pull-request
+        status: success
+        context: iam-role
+
+  - aggregate:
+    - task: run-test
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source:
+            repository: concourse/docker-image-resource
+            tag: latest
+        inputs:
+          - name: pull-request
+        run:
+          path: pytest
+          args:
+            - ./pull-request/tests
+      on_failure:
+        put: pull-request
+        params:
+          path: pull-request
+          status: failure
+          context: unittests
+
+  # mark test as passed
+    - put: pull-request
+      params:
+        path: pull-request
+        status: success
+        context: unittests
+
 resources:
 - name: common-tasks
   type: git
@@ -72,9 +169,22 @@ resources:
     access_key_id: ((secrets.ecr-access-key-id))
     secret_access_key: ((secrets.ecr-secret-access-key))
 
+- name: pull-request
+  type: pull-request
+  check_every: 10m
+  webhook_token: ((secrets.github-webhook-token))
+  source:
+    repository: ((github-org))/((github-repo))
+    access_token: ((secrets.github-access-token))
+
 resource_types:
 - name: ecr-repo
   type: docker-image
   source:
     repository: quay.io/mojanalytics/concourse-ecr-resource
     tag: v0.1.0
+
+- name: pull-request
+  type: docker-image
+  source:
+    repository: teliaoss/github-pr-resource
