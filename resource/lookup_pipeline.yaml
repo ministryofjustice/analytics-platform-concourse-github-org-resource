@@ -42,6 +42,7 @@ jobs:
   # Update github 'checks' on PR
   - aggregate:
     - put: pull-request
+      attempts: 3
       params:
         path: pull-request
         status: pending
@@ -69,6 +70,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ((secrets.lookup-secret-access-key))
       on_failure:
         put: pull-request
+        attempts: 3
         params:
           path: pull-request
           status: failure
@@ -76,6 +78,7 @@ jobs:
 
   # mark test as passed
     - put: pull-request
+      attempts: 3
       params:
         path: pull-request
         status: success

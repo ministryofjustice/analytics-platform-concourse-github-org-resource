@@ -60,16 +60,19 @@ jobs:
   # Update github 'checks' on PR
   - aggregate:
     - put: pull-request
+      attempts: 3
       params:
         path: pull-request
         status: pending
         context: iam-role
     - put: pull-request
+      attempts: 3
       params:
         path: pull-request
         status: pending
         context: unittests
     - put: pull-request
+      attempts: 3
       params:
         path: pull-request
         status: pending
@@ -131,6 +134,7 @@ jobs:
         APP_NAME: ((app-name))
       on_failure:
         put: pull-request
+        attempts: 3
         params:
           path: pull-request
           status: failure
@@ -161,6 +165,7 @@ jobs:
               fi
       on_failure:
         put: pull-request
+        attempts: 3
         params:
           path: pull-request
           status: failure
@@ -198,22 +203,26 @@ jobs:
               "
       on_failure:
         put: pull-request
+        attempts: 3
         params:
           path: pull-request
           status: failure
           context: syntax
     # mark test as passed
     - put: pull-request
+      attempts: 3
       params:
         path: pull-request
         status: success
         context: iam-role
     - put: pull-request
+      attempts: 3
       params:
         path: pull-request
         status: success
         context: unittests
     - put: pull-request
+      attempts: 3
       params:
         path: pull-request
         status: success
@@ -241,11 +250,13 @@ jobs:
               aws iam delete-role --role-name $ROLE_NAME
       on_failure:
         put: pull-request
+        attempts: 3
         params:
           path: pull-request
           status: failure
           context: iam-role
     - put: pull-request
+      attempts: 3
       params:
         path: pull-request
         status: success
