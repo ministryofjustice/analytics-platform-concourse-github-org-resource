@@ -43,19 +43,18 @@ def create_pipelines(src_dir, source={}, params={}):
     repos = get_all(org['repos_url'], **source)
 
     for repo in repos:
-        if repo['name'] in pipelines:
-            print(
-                f'Pipeline exists for {repo["name"]}',
-                flush=True)
-            continue
-
         if buildfile_exists(repo, **source):
-            print(
-                (
-                    f'{ansi.green}Creating pipeline for '
-                    f'{repo["name"]}{ansi.reset}'
-                ),
-                flush=True)
+            if repo['name'] in pipelines:
+                print(
+                    f'Pipeline exists for {repo["name"]}',
+                    flush=True)
+            else:
+                print(
+                    (
+                        f'{ansi.green}Creating pipeline for '
+                        f'{repo["name"]}{ansi.reset}'
+                    ),
+                    flush=True)
 
             pipeline_type = buildfile_type(repo, **source)
 
