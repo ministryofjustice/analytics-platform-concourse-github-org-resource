@@ -191,12 +191,15 @@ jobs:
               # Try importing files in base dir to check for syntax errors
               docker run --entrypoint "" dag/test:latest python -c "
               import os
+              import sys
               from importlib import import_module
               prefix = os.getcwd()
               print(f'Working directory: {prefix}')
               for dirpath, dirnames, filenames in os.walk(prefix):
                   trimmed_mods = [f[:f.find('.py')] for f in filenames if not f.startswith('__') and f.find('.py') > 0]
                   for m in trimmed_mods:
+                      if dirpath not in sys.path:
+                          sys.path.insert(0, dirpath)
                       mod = dirpath.replace(prefix + '/', '').replace('/', '.') + '.' + m
                       print(f'importing: {mod}')
                       import_module(mod)
