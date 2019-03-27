@@ -114,6 +114,7 @@ jobs:
             - |
               cp -R ./pull-request/* ./pull-request-edit
               jq '.role_name = "test_dag_role"' ./pull-request/deploy.json > ./pull-request-edit/deploy.json
+              jq '.Statement += [{"Sid": "denyall","Action": ["*"],"Effect": "Deny","Resource": ["*"]}]' ./pull-request/iam_policy.json > ./pull-request-edit/iam_policy.json
               cat ./pull-request-edit/deploy.json
         outputs:
           - name: pull-request-edit
