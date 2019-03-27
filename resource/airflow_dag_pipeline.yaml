@@ -49,6 +49,222 @@ jobs:
       AWS_NODES_ROLE_ARN: ((secrets.nodes-role-arn))
       APP_NAME: ((app-name))
 
+- name: test
+  plan:
+  - get: pull-request
+    trigger: true
+    version: every
+
+  - get: common-tasks
+
+  # Update github 'checks' on PR
+  - aggregate:
+    - put: pull-request
+      attempts: 3
+      params:
+        path: pull-request
+        status: pending
+        context: iam-role
+    - put: pull-request
+      attempts: 3
+      params:
+        path: pull-request
+        status: pending
+        context: unittests
+    - put: pull-request
+      attempts: 3
+      params:
+        path: pull-request
+        status: pending
+        context: syntax
+
+  - aggregate:
+    - task: build-dag-docker-image
+      privileged: true
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source:
+            repository: concourse/builder
+        inputs:
+          - name: pull-request
+        params:
+          REPOSITORY: dag/test
+          CONTEXT: pull-request
+        run:
+          path: build
+        outputs:
+          - name: image
+
+  - aggregate:
+    - task: update-to-test-iam-role-name
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source:
+            repository: concourse/docker-image-resource
+        inputs:
+          - name: pull-request
+        run:
+          path: sh
+          args:
+            - -ecx
+            - |
+              cp -R ./pull-request/* ./pull-request-edit
+              jq '.role_name = "test_dag_role"' ./pull-request/deploy.json > ./pull-request-edit/deploy.json
+              jq '.Statement += [{"Sid": "denyall","Action": ["*"],"Effect": "Deny","Resource": ["*"]}]' ./pull-request/iam_policy.json > ./pull-request-edit/iam_policy.json
+              cat ./pull-request-edit/deploy.json
+        outputs:
+          - name: pull-request-edit
+
+  # test creating the IAM role
+  - aggregate:
+    - task: create-iam-role-name
+      file: common-tasks/put-iam-role.yaml
+      output_mapping: {output: aws}
+      input_mapping:
+        source: pull-request-edit
+      params:
+        ORG_NAME: ((github-org))
+        REPO_NAME: ((github-repo))
+        AWS_ACCESS_KEY_ID: ((secrets.role-putter-access-key-id))
+        AWS_SECRET_ACCESS_KEY: ((secrets.role-putter-secret-access-key))
+        AWS_NODES_ROLE_ARN: ((secrets.nodes-role-arn))
+        APP_NAME: ((app-name))
+      on_failure:
+        put: pull-request
+        attempts: 3
+        params:
+          path: pull-request
+          status: failure
+          context: iam-role
+    - task: run-test
+      privileged: true
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source:
+            repository: amidos/dcind
+        inputs:
+          - name: image
+        run:
+          path: sh
+          args:
+            - -ec
+            - |
+              source /docker-lib.sh
+              start_docker
+              docker load -i image/image.tar
+              echo "Installing pytest"
+              docker run --entrypoint "" dag/test:latest pip install pytest
+              if [ -d "tests" ]; then
+                echo "Running tests in tests dir"
+                docker run --entrypoint "" dag/test:latest pytest tests
+              fi
+      on_failure:
+        put: pull-request
+        attempts: 3
+        params:
+          path: pull-request
+          status: failure
+          context: unittests
+    - task: run-syntax
+      privileged: true
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source:
+            repository: amidos/dcind
+        inputs:
+          - name: image
+        run:
+          path: sh
+          args:
+            - -ec
+            - |
+              source /docker-lib.sh
+              start_docker
+              docker load -i image/image.tar
+              # Try importing files in base dir to check for syntax errors
+              docker run --entrypoint "" dag/test:latest python -c "
+              import os
+              import sys
+              from importlib import import_module
+              prefix = os.getcwd()
+              print(f'Working directory: {prefix}')
+              for dirpath, dirnames, filenames in os.walk(prefix):
+                  trimmed_mods = [f[:f.find('.py')] for f in filenames if not f.startswith('__') and f.find('.py') > 0]
+                  for m in trimmed_mods:
+                      if dirpath not in sys.path:
+                          sys.path.insert(0, dirpath)
+                      mod = dirpath.replace(prefix + '/', '').replace('/', '.') + '.' + m
+                      print(f'importing: {mod}')
+                      import_module(mod)
+              "
+      on_failure:
+        put: pull-request
+        attempts: 3
+        params:
+          path: pull-request
+          status: failure
+          context: syntax
+    # mark test as passed
+    - put: pull-request
+      attempts: 3
+      params:
+        path: pull-request
+        status: success
+        context: iam-role
+    - put: pull-request
+      attempts: 3
+      params:
+        path: pull-request
+        status: success
+        context: unittests
+    - put: pull-request
+      attempts: 3
+      params:
+        path: pull-request
+        status: success
+        context: syntax
+  - aggregate:
+    - task: delete-iam-role-name
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source:
+            repository: governmentpaas/awscli
+        inputs:
+          - name: pull-request-edit
+        params:
+          AWS_ACCESS_KEY_ID: ((secrets.role-putter-access-key-id))
+          AWS_SECRET_ACCESS_KEY: ((secrets.role-putter-secret-access-key))
+          AWS_NODES_ROLE_ARN: ((secrets.nodes-role-arn))
+        run:
+          path: sh
+          args:
+            - -ecx
+            - |
+              export ROLE_NAME=$(cat source/deploy.json | jq -r '.role_name')
+              aws iam delete-role --role-name $ROLE_NAME
+      on_failure:
+        put: pull-request
+        attempts: 3
+        params:
+          path: pull-request
+          status: failure
+          context: iam-role
+    - put: pull-request
+      attempts: 3
+      params:
+        path: pull-request
+        status: success
+        context: iam-role
 resources:
 - name: common-tasks
   type: git
@@ -72,9 +288,22 @@ resources:
     access_key_id: ((secrets.ecr-access-key-id))
     secret_access_key: ((secrets.ecr-secret-access-key))
 
+- name: pull-request
+  type: pull-request
+  check_every: 10m
+  webhook_token: ((secrets.github-webhook-token))
+  source:
+    repository: ((github-org))/((github-repo))
+    access_token: ((secrets.github-access-token))
+
 resource_types:
 - name: ecr-repo
   type: docker-image
   source:
     repository: quay.io/mojanalytics/concourse-ecr-resource
     tag: v0.1.0
+
+- name: pull-request
+  type: docker-image
+  source:
+    repository: teliaoss/github-pr-resource

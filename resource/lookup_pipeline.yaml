@@ -33,6 +33,63 @@ jobs:
         AWS_ACCESS_KEY_ID: ((secrets.lookup-access-key-id))
         AWS_SECRET_ACCESS_KEY: ((secrets.lookup-secret-access-key))
 
+- name: test
+  plan:
+  - get: pull-request
+    trigger: true
+    version: every
+
+  # Update github 'checks' on PR
+  - aggregate:
+    - put: pull-request
+      attempts: 3
+      params:
+        path: pull-request
+        status: pending
+        context: test
+
+  # run the test
+  - aggregate:
+    - task: run-test
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source:
+            repository: quay.io/mojanalytics/lookup-tables-etl
+            tag: latest
+        inputs:
+          - name: pull-request
+        run:
+          path: pytest
+          args:
+            - /tests/test_data.py
+        params:
+          SOURCE_DIR: pull-request
+          AWS_ACCESS_KEY_ID: ((secrets.lookup-access-key-id))
+          AWS_SECRET_ACCESS_KEY: ((secrets.lookup-secret-access-key))
+      on_failure:
+        put: pull-request
+        attempts: 3
+        params:
+          path: pull-request
+          status: failure
+          context: test
+
+  # mark test as passed
+    - put: pull-request
+      attempts: 3
+      params:
+        path: pull-request
+        status: success
+        context: test
+
+resource_types:
+- name: pull-request
+  type: docker-image
+  source:
+    repository: teliaoss/github-pr-resource
+
 resources:
 - name: common-tasks
   type: git
@@ -46,4 +103,12 @@ resources:
   source:
     owner: ((github-org))
     repository: ((github-repo))
+    access_token: ((secrets.github-access-token))
+
+- name: pull-request
+  type: pull-request
+  check_every: 10m
+  webhook_token: ((secrets.github-webhook-token))
+  source:
+    repository: ((github-org))/((github-repo))
     access_token: ((secrets.github-access-token))
