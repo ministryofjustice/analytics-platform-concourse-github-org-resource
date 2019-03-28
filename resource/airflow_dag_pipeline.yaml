@@ -113,7 +113,7 @@ jobs:
             - -ecx
             - |
               cp -R ./pull-request/* ./pull-request-edit
-              jq '.role_name = "test_dag_role"' ./pull-request/deploy.json > ./pull-request-edit/deploy.json
+              jq '.role_name = "airflow_test_dag_role"' ./pull-request/deploy.json > ./pull-request-edit/deploy.json
               jq '.Statement += [{"Sid": "denyall","Action": ["*"],"Effect": "Deny","Resource": ["*"]}]' ./pull-request/iam_policy.json > ./pull-request-edit/iam_policy.json
               cat ./pull-request-edit/deploy.json
         outputs:
@@ -231,34 +231,6 @@ jobs:
         path: pull-request
         status: success
         context: syntax
-  - aggregate:
-    - task: delete-iam-role-name
-      config:
-        platform: linux
-        image_resource:
-          type: docker-image
-          source:
-            repository: governmentpaas/awscli
-        inputs:
-          - name: pull-request-edit
-        params:
-          AWS_ACCESS_KEY_ID: ((secrets.role-putter-access-key-id))
-          AWS_SECRET_ACCESS_KEY: ((secrets.role-putter-secret-access-key))
-          AWS_NODES_ROLE_ARN: ((secrets.nodes-role-arn))
-        run:
-          path: sh
-          args:
-            - -ecx
-            - |
-              export ROLE_NAME=$(cat source/deploy.json | jq -r '.role_name')
-              aws iam delete-role --role-name $ROLE_NAME
-      on_failure:
-        put: pull-request
-        attempts: 3
-        params:
-          path: pull-request
-          status: failure
-          context: iam-role
     - put: pull-request
       attempts: 3
       params:
