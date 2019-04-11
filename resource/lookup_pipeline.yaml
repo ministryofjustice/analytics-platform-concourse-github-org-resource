@@ -8,7 +8,7 @@ jobs:
     params:
       include_source_tarball: true
     outputs:
-      - name: tag
+      - name: release
 
   - get: common-tasks
 
@@ -19,7 +19,6 @@ jobs:
    - task: karik-test
     config:
       inputs:
-      - name: tag
       - name: release
 
       run:
@@ -27,7 +26,7 @@ jobs:
         args:
         - -c
         - |
-        ls ./release ./tag
+        ls ./release
         echo $GITHUB_REPO
       
       params:
