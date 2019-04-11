@@ -7,12 +7,31 @@ jobs:
     trigger: true
     params:
       include_source_tarball: true
+    outputs:
+      - name: tag
 
   - get: common-tasks
 
   - task: lookup-source
     file: common-tasks/extract-release-tarball.yaml
     output_mapping: {extracted: lookup-source}
+
+   - task: karik-test
+    config:
+      inputs:
+      - name: tag
+      - name: release
+
+      run:
+        path: sh
+        args:
+        - -c
+        - |
+        ls ./release ./tag
+        echo $GITHUB_REPO
+      
+      params:
+        GITHUB_REPO: ((github-repo))
 
   - task: run-lookup-etl
     config:
@@ -24,6 +43,7 @@ jobs:
           tag: latest
       inputs:
         - name: lookup-source
+        - tag
       run:
         path: python
         args:
@@ -32,6 +52,7 @@ jobs:
         SOURCE_DIR: lookup-source
         AWS_ACCESS_KEY_ID: ((secrets.lookup-access-key-id))
         AWS_SECRET_ACCESS_KEY: ((secrets.lookup-secret-access-key))
+        GITHUB_REPO: ((github-repo))
 
 - name: test
   plan:
