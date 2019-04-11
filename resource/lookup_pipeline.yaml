@@ -127,7 +127,7 @@ resources:
 
 - name: pull-request
   type: pull-request
-  check_every: 10m
+  check_every: 24h
   webhook_token: ((secrets.github-webhook-token))
   source:
     repository: ((github-org))/((github-repo))
