@@ -7,8 +7,6 @@ jobs:
     trigger: true
     params:
       include_source_tarball: true
-    outputs:
-      - name: release
 
   - get: common-tasks
 
