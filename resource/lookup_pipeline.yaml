@@ -16,22 +16,6 @@ jobs:
     file: common-tasks/extract-release-tarball.yaml
     output_mapping: {extracted: lookup-source}
 
-   - task: karik-test
-    config:
-      inputs:
-      - name: release
-
-      run:
-        path: sh
-        args:
-        - -c
-        - |
-        ls ./release
-        echo $GITHUB_REPO
-      
-      params:
-        GITHUB_REPO: ((github-repo))
-
   - task: run-lookup-etl
     config:
       platform: linux
@@ -39,19 +23,19 @@ jobs:
         type: docker-image
         source:
           repository: quay.io/mojanalytics/lookup-tables-etl
-          tag: latest
+          tag: v0.0.10
       inputs:
         - name: lookup-source
-        - tag
+        - name: release
       run:
         path: python
         args:
           - /etl/run.py
       params:
         SOURCE_DIR: lookup-source
+        GITHUB_REPO: ((github-repo))
         AWS_ACCESS_KEY_ID: ((secrets.lookup-access-key-id))
         AWS_SECRET_ACCESS_KEY: ((secrets.lookup-secret-access-key))
-        GITHUB_REPO: ((github-repo))
 
 - name: test
   plan:
