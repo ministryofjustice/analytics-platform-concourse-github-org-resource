@@ -21,7 +21,7 @@ jobs:
         type: docker-image
         source:
           repository: quay.io/mojanalytics/lookup-tables-etl
-          tag: v0.0.10
+          tag: latest
       inputs:
         - name: lookup-source
         - name: release
@@ -68,6 +68,7 @@ jobs:
             - /tests/test_data.py
         params:
           SOURCE_DIR: pull-request
+          GITHUB_REPO: ((github-repo))
           AWS_ACCESS_KEY_ID: ((secrets.lookup-access-key-id))
           AWS_SECRET_ACCESS_KEY: ((secrets.lookup-secret-access-key))
       on_failure:

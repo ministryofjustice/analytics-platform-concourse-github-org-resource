@@ -140,6 +140,13 @@ jobs:
           path: pull-request
           status: failure
           context: iam-role
+      on_success:
+        put: pull-request
+        attempts: 3
+        params:
+          path: pull-request
+          status: success
+          context: iam-role
     - task: run-test
       privileged: true
       config:
@@ -170,6 +177,13 @@ jobs:
         params:
           path: pull-request
           status: failure
+          context: unittests
+      on_success:
+        put: pull-request
+        attempts: 3
+        params:
+          path: pull-request
+          status: success
           context: unittests
     - task: run-syntax
       privileged: true
@@ -212,31 +226,49 @@ jobs:
           path: pull-request
           status: failure
           context: syntax
-    # mark test as passed
-    - put: pull-request
-      attempts: 3
-      params:
-        path: pull-request
-        status: success
-        context: iam-role
-    - put: pull-request
-      attempts: 3
-      params:
-        path: pull-request
-        status: success
-        context: unittests
-    - put: pull-request
-      attempts: 3
-      params:
-        path: pull-request
-        status: success
-        context: syntax
-    - put: pull-request
-      attempts: 3
-      params:
-        path: pull-request
-        status: success
-        context: iam-role
+      on_success:
+        put: pull-request
+        attempts: 3
+        params:
+          path: pull-request
+          status: success
+          context: syntax
+  - put: dag-docker-repo
+  - aggregate:
+    - task: send-image-to-ecr
+      privileged: true
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source:
+            repository: concourse/docker-image-resource
+            tag: 'pr-227'
+        inputs:
+          - name: dag-docker-repo
+          - name: pull-request
+        outputs:
+          - name: dag-docker-image
+        params:
+          AWS_ACCESS_KEY_ID: ((secrets.ecr-access-key-id))
+          AWS_SECRET_ACCESS_KEY: ((secrets.ecr-secret-access-key))
+        run:
+          path: sh
+          args:
+            - -ec
+            - |
+              jq -r '.[2] | .value' $(pwd)/pull-request/.git/resource/metadata.json > $(pwd)/pull-request/tag
+              jq -n "{
+                source: {
+                  repository: \"$(cat dag-docker-repo/uri)\",
+                  aws_access_key_id: \"${AWS_ACCESS_KEY_ID}\",
+                  aws_secret_access_key: \"${AWS_SECRET_ACCESS_KEY}\"
+                },
+                params: {
+                  build: \"$(pwd)/pull-request\",
+                  tag: \"$(pwd)/pull-request/tag\"
+                }
+              }" | /opt/resource/out dag-docker-image
 resources:
 - name: common-tasks
   type: git
