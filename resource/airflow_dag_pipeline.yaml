@@ -247,6 +247,7 @@ jobs:
         inputs:
           - name: dag-docker-repo
           - name: pull-request
+          - name: image
         outputs:
           - name: dag-docker-image
         params:
@@ -265,7 +266,9 @@ jobs:
                   aws_secret_access_key: \"${AWS_SECRET_ACCESS_KEY}\"
                 },
                 params: {
-                  build: \"$(pwd)/pull-request\",
+                  load_file: \"$(pwd)/image/image.tar\",
+                  load_repository: \"dag/test\",
+                  load_tag: \"latest\",
                   tag: \"$(pwd)/pull-request/tag\"
                 }
               }" | /opt/resource/out dag-docker-image
