@@ -122,7 +122,6 @@ jobs:
   # test creating the IAM role
   - aggregate:
     - task: check-diff-in-iam-role
-      privileged: true
       config:
         platform: linux
         image_resource:
