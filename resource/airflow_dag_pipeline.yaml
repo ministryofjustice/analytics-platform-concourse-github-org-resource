@@ -121,6 +121,47 @@ jobs:
 
   # test creating the IAM role
   - aggregate:
+    - task: check-diff-in-iam-role
+      privileged: true
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source:
+            repository: governmentpaas/awscli
+        inputs:
+          - name: pull-request
+        params:
+          AWS_ACCESS_KEY_ID: ((secrets.role-putter-access-key-id))
+          AWS_SECRET_ACCESS_KEY: ((secrets.role-putter-secret-access-key))
+          APP_NAME: ((app-name))
+        run:
+          path: sh
+          args:
+            - -ec
+            - |
+              export ROLE_NAME=$(cat ./pull-request/deploy.json | jq -r '.role_name')
+              cat $(aws iam get-role-policy --role-name $ROLE_NAME --policy-name $APP_NAME | jq -r '.PolicyDocument') > ./pull-request/existing_iam_policy.json
+              export ARE_SAME==$(jq --argfile a ./pull-request/iam_policy.json --argfile b ./pull-request/existing_iam_policy.json -n '$a==$b')
+              if [ \"$ARE_SAME\" != \"true\" ]; then
+                echo "\033[0;31m$(diff <(jq -S . ./pull-request/iam_policy.json) <(jq -S . ./pull-request/existing_iam_policy.json))
+                exit 166
+              fi
+              echo '\033[0;32m$No changes in iam_policy.json'
+      on_failure:
+        put: pull-request
+        attempts: 3
+        params:
+          path: pull-request
+          status: failure
+          context: iam-policy-changed
+      on_success:
+        put: pull-request
+        attempts: 3
+        params:
+          path: pull-request
+          status: success
+          context: iam-policy-changed
     - task: create-iam-role-name
       file: common-tasks/put-iam-role.yaml
       output_mapping: {output: aws}
