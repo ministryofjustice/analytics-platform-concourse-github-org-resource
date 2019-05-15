@@ -35,27 +35,16 @@ jobs:
   - get: common-tasks
 
   - aggregate:
-    - task: build-docker-image
-      privileged: true
-      config:
-        platform: linux
-        image_resource:
-          type: docker-image
-          source:
-            repository: concourse/builder
-        inputs:
-          - name: pull-request
-        params:
-          REPOSITORY: dag/test
-          CONTEXT: pull-request
-        run:
-          path: build
-        outputs:
-          - name: image
+    - put: pull-request
+      attempts: 3
+      params:
+        path: pull-request
+        status: pending
+        context: build-docker-image
 
   - put: docker-repo
   - aggregate:
-    - task: send-image-to-ecr
+    - task: build-docker-image
       privileged: true
       config:
         platform: linux
@@ -67,7 +56,6 @@ jobs:
         inputs:
           - name: docker-repo
           - name: pull-request
-          - name: image
         outputs:
           - name: docker-image
         params:
@@ -86,12 +74,25 @@ jobs:
                   aws_secret_access_key: \"${AWS_SECRET_ACCESS_KEY}\"
                 },
                 params: {
-                  load_file: \"$(pwd)/image/image.tar\",
-                  load_repository: \"dag/test\",
-                  load_tag: \"latest\",
+                  build: \"$(pwd)/pull-request\"
                   tag: \"$(pwd)/pull-request/tag\"
                 }
               }" | /opt/resource/out docker-image
+      on_failure:
+        put: pull-request
+        attempts: 3
+        params:
+          path: pull-request
+          status: failure
+          context: build-docker-image
+      on_success:
+        put: pull-request
+        attempts: 3
+        params:
+          path: pull-request
+          status: success
+          context: build-docker-image
+
 resources:
 - name: common-tasks
   type: git
