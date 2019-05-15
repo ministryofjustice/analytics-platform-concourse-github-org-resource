@@ -121,7 +121,8 @@ jobs:
 
   # test creating the IAM role
   - aggregate:
-    - task: check-diff-in-iam-role
+    try:
+      task: check-diff-in-iam-role
       config:
         platform: linux
         image_resource:
@@ -140,13 +141,16 @@ jobs:
             - -ec
             - |
               export ROLE_NAME=$(cat ./pull-request/deploy.json | jq -r '.role_name')
-              cat $(aws iam get-role-policy --role-name $ROLE_NAME --policy-name $APP_NAME | jq -r '.PolicyDocument') > ./pull-request/existing_iam_policy.json
-              export ARE_SAME==$(jq --argfile a ./pull-request/iam_policy.json --argfile b ./pull-request/existing_iam_policy.json -n '$a==$b')
+              aws iam get-role-policy --role-name $ROLE_NAME --policy-name $APP_NAME | jq -r '.PolicyDocument' > ./pull-request/existing_iam_policy.json
+              export ARE_SAME=$(jq --argfile a ./pull-request/iam_policy.json --argfile b ./pull-request/existing_iam_policy.json -n '$a==$b')
               if [ \"$ARE_SAME\" != \"true\" ]; then
-                echo "\033[0;31m$(diff <(jq -S . ./pull-request/iam_policy.json) <(jq -S . ./pull-request/existing_iam_policy.json))
+                jq -S . ./pull-request/iam_policy.json > new.json
+                jq -S . ./pull-request/existing_iam_policy.json > current.json
+                echo -e '\033[0;31mChange in iam_policy.json'
+                diff current.json new.json
                 exit 166
               fi
-              echo '\033[0;32m$No changes in iam_policy.json'
+              echo -e '\033[0;32mNo changes in iam_policy.json'
       on_failure:
         put: pull-request
         attempts: 3
@@ -161,6 +165,7 @@ jobs:
           path: pull-request
           status: success
           context: iam-policy-changed
+  - aggregate:
     - task: create-iam-role-name
       file: common-tasks/put-iam-role.yaml
       output_mapping: {output: aws}
