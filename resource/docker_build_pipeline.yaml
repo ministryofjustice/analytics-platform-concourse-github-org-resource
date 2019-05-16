@@ -74,7 +74,7 @@ jobs:
                   aws_secret_access_key: \"${AWS_SECRET_ACCESS_KEY}\"
                 },
                 params: {
-                  build: \"$(pwd)/pull-request\"
+                  build: \"$(pwd)/pull-request\",
                   tag: \"$(pwd)/pull-request/tag\"
                 }
               }" | /opt/resource/out docker-image
