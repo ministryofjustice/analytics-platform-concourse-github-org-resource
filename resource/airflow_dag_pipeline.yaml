@@ -14,6 +14,26 @@ jobs:
     file: common-tasks/extract-release-tarball.yaml
     output_mapping: {extracted: dag-source}
 
+  - task: build-iam
+    config:
+      platform: linux
+      inputs:
+        - name: dag-source
+      image_resource:
+        type: docker-image
+        source:
+          repository: python
+          tag: alpine
+      run:
+        path: sh
+        args:
+        - -ec
+        - |
+          pip install iam_builder
+          if [ -f ./pull-request/iam_config.yaml ] && [ ! -f ./pull-request/iam_policy.json ]; then
+            iam_builder -c ./pull-request/iam_config.yaml -o ./pull-request/iam_policy.json
+          fi
+
   - task: deploy-params
     file: common-tasks/parse-deploy-file.yaml
     input_mapping: {webapp-source: dag-source}
@@ -54,6 +74,27 @@ jobs:
   - get: pull-request
     trigger: true
     version: every
+
+  - aggregate:
+    - task: build-iam
+      config:
+        platform: linux
+        inputs:
+          - name: pull-request
+        image_resource:
+          type: docker-image
+          source:
+            repository: python
+            tag: alpine
+        run:
+          path: sh
+          args:
+          - -ec
+          - |
+            pip install iam_builder
+            if [ -f ./pull-request/iam_config.yaml ] && [ ! -f ./pull-request/iam_policy.json ]; then
+              iam_builder -c ./pull-request/iam_config.yaml -o ./pull-request/iam_policy.json
+            fi
 
   - get: common-tasks
 
@@ -236,7 +277,8 @@ jobs:
         image_resource:
           type: docker-image
           source:
-            repository: python/alpine
+            repository: python
+            tag: alpine
         inputs:
           - name: pull-request
         run:
@@ -245,7 +287,7 @@ jobs:
             - -ec
             - |
               pip install flake8
-              flake8 ./pull-request
+              flake8 ./pull-request/
       on_failure:
         put: pull-request
         attempts: 3
