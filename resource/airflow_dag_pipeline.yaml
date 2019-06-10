@@ -12,27 +12,14 @@ jobs:
 
   - task: dag-source
     file: common-tasks/extract-release-tarball.yaml
-    output_mapping: {extracted: dag-source}
+    output_mapping: {extracted: dag-source-extracted}
 
   - task: build-iam
-    config:
-      platform: linux
-      inputs:
-        - name: dag-source
-      image_resource:
-        type: docker-image
-        source:
-          repository: python
-          tag: alpine
-      run:
-        path: sh
-        args:
-        - -ec
-        - |
-          pip install iam_builder
-          if [ -f ./pull-request/iam_config.yaml ] && [ ! -f ./pull-request/iam_policy.json ]; then
-            iam_builder -c ./pull-request/iam_config.yaml -o ./pull-request/iam_policy.json
-          fi
+    file: common-tasks/build-iam.yaml
+    input_mapping:
+      source: dag-source-extracted
+    output_mapping:
+      source-out: dag-source
 
   - task: deploy-params
     file: common-tasks/parse-deploy-file.yaml
@@ -75,28 +62,15 @@ jobs:
     trigger: true
     version: every
 
+  - get: common-tasks
+
   - aggregate:
     - task: build-iam
-      config:
-        platform: linux
-        inputs:
-          - name: pull-request
-        image_resource:
-          type: docker-image
-          source:
-            repository: python
-            tag: alpine
-        run:
-          path: sh
-          args:
-          - -ec
-          - |
-            pip install iam_builder
-            if [ -f ./pull-request/iam_config.yaml ] && [ ! -f ./pull-request/iam_policy.json ]; then
-              iam_builder -c ./pull-request/iam_config.yaml -o ./pull-request/iam_policy.json
-            fi
-
-  - get: common-tasks
+      file: common-tasks/build-iam.yaml
+      input_mapping:
+        source: pull-request
+      output_mapping:
+        source-out: pr-with-iam
 
   # Update github 'checks' on PR
   - aggregate:
@@ -139,59 +113,30 @@ jobs:
           - name: image
 
   - aggregate:
-    - task: update-to-test-iam-role-name
+    - task: updated-repo-name
       config:
         platform: linux
         image_resource:
           type: docker-image
           source:
-            repository: concourse/docker-image-resource
-        inputs:
-          - name: pull-request
+            repository: busybox
         run:
           path: sh
           args:
             - -ecx
             - |
-              cp -R ./pull-request/* ./pull-request-edit
-              jq '.role_name = "airflow_test_dag_role"' ./pull-request/deploy.json > ./pull-request-edit/deploy.json
-              jq '.Statement += [{"Sid": "denyall","Action": ["*"],"Effect": "Deny","Resource": ["*"]}]' ./pull-request/iam_policy.json > ./pull-request-edit/iam_policy.json
-              cat ./pull-request-edit/deploy.json
+              echo ((github-repo)) > repos/list.txt
         outputs:
-          - name: pull-request-edit
+          - name: repos
 
-  # test creating the IAM role
+  - aggregate:
+    - task: extract-policies-from-repos
+      file: common-tasks/extract-policies-from-repos.yaml
+
   - aggregate:
     try:
       task: check-diff-in-iam-role
-      config:
-        platform: linux
-        image_resource:
-          type: docker-image
-          source:
-            repository: governmentpaas/awscli
-        inputs:
-          - name: pull-request
-        params:
-          AWS_ACCESS_KEY_ID: ((secrets.role-putter-access-key-id))
-          AWS_SECRET_ACCESS_KEY: ((secrets.role-putter-secret-access-key))
-          APP_NAME: ((app-name))
-        run:
-          path: sh
-          args:
-            - -ec
-            - |
-              export ROLE_NAME=$(cat ./pull-request/deploy.json | jq -r '.role_name')
-              aws iam get-role-policy --role-name $ROLE_NAME --policy-name $APP_NAME | jq -r '.PolicyDocument' > ./pull-request/existing_iam_policy.json
-              export ARE_SAME=$(jq --argfile a ./pull-request/iam_policy.json --argfile b ./pull-request/existing_iam_policy.json -n '$a==$b')
-              if [ \"$ARE_SAME\" != \"true\" ]; then
-                jq -S . ./pull-request/iam_policy.json > new.json
-                jq -S . ./pull-request/existing_iam_policy.json > current.json
-                echo -e '\033[0;31mChange in iam_policy.json'
-                diff current.json new.json
-                exit 166
-              fi
-              echo -e '\033[0;32mNo changes in iam_policy.json'
+      file: common-tasks/diff-iam-policy.yaml
       on_failure:
         put: pull-request
         attempts: 3
@@ -206,6 +151,29 @@ jobs:
           path: pull-request
           status: success
           context: iam-policy-changed
+
+  - aggregate:
+    - task: update-to-test-iam-role-name
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source:
+            repository: concourse/docker-image-resource
+        inputs:
+          - name: pr-with-iam
+        run:
+          path: sh
+          args:
+            - -ecx
+            - |
+              cp -R ./pr-with-iam/* ./pull-request-edit
+              jq '.role_name = "airflow_test_dag_role"' ./pr-with-iam/deploy.json > ./pull-request-edit/deploy.json
+              jq '.Statement += [{"Sid": "denyall","Action": ["*"],"Effect": "Deny","Resource": ["*"]}]' ./pr-with-iam/iam_policy.json > ./pull-request-edit/iam_policy.json
+              cat ./pull-request-edit/deploy.json
+        outputs:
+          - name: pull-request-edit
+  # test creating the IAM role
   - aggregate:
     - task: create-iam-role-name
       file: common-tasks/put-iam-role.yaml
@@ -272,22 +240,9 @@ jobs:
           status: success
           context: unittests
     - task: run-syntax
-      config:
-        platform: linux
-        image_resource:
-          type: docker-image
-          source:
-            repository: python
-            tag: alpine
-        inputs:
-          - name: pull-request
-        run:
-          path: sh
-          args:
-            - -ec
-            - |
-              pip install flake8
-              flake8 ./pull-request/
+      file: common-tasks/python-flake8.yaml
+      input_mapping:
+        source: pull-request
       on_failure:
         put: pull-request
         attempts: 3
