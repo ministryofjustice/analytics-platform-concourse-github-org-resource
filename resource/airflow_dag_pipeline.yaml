@@ -113,25 +113,26 @@ jobs:
           - name: image
 
   - aggregate:
-    - task: updated-repo-name
+    - task: -list-policy
       config:
         platform: linux
         image_resource:
           type: docker-image
           source:
-            repository: busybox
+            repository: quay.io/s_block/alpine-git-jq
         run:
           path: sh
           args:
             - -ecx
             - |
-              echo ((github-repo)) > repos/list.txt
+              role=$(cat ./pr-with-iam/deploy.json | jq -r '.role_name')
+              policy=$(cat ./pr-with-iam/iam_policy.json | jq -r .)
+              policies=$(echo [] | jq --argjson policy "$policy" --arg role "$role"  --arg app_name "((app-name))" '. += [{role: $role, policy: $policy, app_name: $app_name}]'
+              echo $policies | jq -S . > policies/list.json
+        inputs:
+          - name: pr-with-iam
         outputs:
-          - name: repos
-
-  - aggregate:
-    - task: extract-policies-from-repos
-      file: common-tasks/extract-policies-from-repos.yaml
+          - name: policies
 
   - aggregate:
     try:
