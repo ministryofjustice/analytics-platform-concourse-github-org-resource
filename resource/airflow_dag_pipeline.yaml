@@ -121,14 +121,18 @@ jobs:
           source:
             repository: quay.io/s_block/alpine-git-jq
         run:
-          path: sh
+          path: bash
           args:
             - -ecx
             - |
+              echo '[]' | jq -S . > ./policies/list.json
               role=$(cat ./pr-with-iam/deploy.json | jq -r '.role_name')
               policy=$(cat ./pr-with-iam/iam_policy.json | jq -r .)
-              policies=$(echo [] | jq --argjson policy "$policy" --arg role "$role"  --arg app_name "((app-name))" '. += [{role: $role, policy: $policy, app_name: $app_name}]'
+              policies=$(cat ./policies/list.json | jq --argjson policy "$policy" --arg role "$role"  --arg app_name "$app_name" '. += [{role: $role, policy: $policy, app_name: $app_name}]')
               echo $policies | jq -S . > policies/list.json
+              cat policies/list.json | jq -S .
+        params:
+          app_name: ((app-name))
         inputs:
           - name: pr-with-iam
         outputs:
