@@ -12,7 +12,14 @@ jobs:
 
   - task: dag-source
     file: common-tasks/extract-release-tarball.yaml
-    output_mapping: {extracted: dag-source}
+    output_mapping: {extracted: dag-source-extracted}
+
+  - task: build-iam
+    file: common-tasks/build-iam.yaml
+    input_mapping:
+      source: dag-source-extracted
+    output_mapping:
+      source-out: dag-source
 
   - task: deploy-params
     file: common-tasks/parse-deploy-file.yaml
@@ -57,6 +64,14 @@ jobs:
 
   - get: common-tasks
 
+  - aggregate:
+    - task: build-iam
+      file: common-tasks/build-iam.yaml
+      input_mapping:
+        source: pull-request
+      output_mapping:
+        source-out: pr-with-iam
+
   # Update github 'checks' on PR
   - aggregate:
     - put: pull-request
@@ -98,59 +113,35 @@ jobs:
           - name: image
 
   - aggregate:
-    - task: update-to-test-iam-role-name
+    - task: list-policy
       config:
         platform: linux
         image_resource:
           type: docker-image
           source:
-            repository: concourse/docker-image-resource
-        inputs:
-          - name: pull-request
+            repository: quay.io/mojanalytics/alpine-python-git-jq
         run:
-          path: sh
+          path: bash
           args:
             - -ecx
             - |
-              cp -R ./pull-request/* ./pull-request-edit
-              jq '.role_name = "airflow_test_dag_role"' ./pull-request/deploy.json > ./pull-request-edit/deploy.json
-              jq '.Statement += [{"Sid": "denyall","Action": ["*"],"Effect": "Deny","Resource": ["*"]}]' ./pull-request/iam_policy.json > ./pull-request-edit/iam_policy.json
-              cat ./pull-request-edit/deploy.json
+              echo '[]' | jq -S . > ./policies/list.json
+              role=$(cat ./pr-with-iam/deploy.json | jq -r '.role_name')
+              policy=$(cat ./pr-with-iam/iam_policy.json | jq -r .)
+              policies=$(cat ./policies/list.json | jq --argjson policy "$policy" --arg role "$role"  --arg app_name "$app_name" '. += [{role: $role, policy: $policy, app_name: $app_name}]')
+              echo $policies | jq -S . > policies/list.json
+              cat policies/list.json | jq -S .
+        params:
+          app_name: ((app-name))
+        inputs:
+          - name: pr-with-iam
         outputs:
-          - name: pull-request-edit
+          - name: policies
 
-  # test creating the IAM role
   - aggregate:
     try:
       task: check-diff-in-iam-role
-      config:
-        platform: linux
-        image_resource:
-          type: docker-image
-          source:
-            repository: governmentpaas/awscli
-        inputs:
-          - name: pull-request
-        params:
-          AWS_ACCESS_KEY_ID: ((secrets.role-putter-access-key-id))
-          AWS_SECRET_ACCESS_KEY: ((secrets.role-putter-secret-access-key))
-          APP_NAME: ((app-name))
-        run:
-          path: sh
-          args:
-            - -ec
-            - |
-              export ROLE_NAME=$(cat ./pull-request/deploy.json | jq -r '.role_name')
-              aws iam get-role-policy --role-name $ROLE_NAME --policy-name $APP_NAME | jq -r '.PolicyDocument' > ./pull-request/existing_iam_policy.json
-              export ARE_SAME=$(jq --argfile a ./pull-request/iam_policy.json --argfile b ./pull-request/existing_iam_policy.json -n '$a==$b')
-              if [ \"$ARE_SAME\" != \"true\" ]; then
-                jq -S . ./pull-request/iam_policy.json > new.json
-                jq -S . ./pull-request/existing_iam_policy.json > current.json
-                echo -e '\033[0;31mChange in iam_policy.json'
-                diff current.json new.json
-                exit 166
-              fi
-              echo -e '\033[0;32mNo changes in iam_policy.json'
+      file: common-tasks/diff-iam-policy.yaml
       on_failure:
         put: pull-request
         attempts: 3
@@ -165,6 +156,29 @@ jobs:
           path: pull-request
           status: success
           context: iam-policy-changed
+
+  - aggregate:
+    - task: update-to-test-iam-role-name
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source:
+            repository: concourse/docker-image-resource
+        inputs:
+          - name: pr-with-iam
+        run:
+          path: sh
+          args:
+            - -ecx
+            - |
+              cp -R ./pr-with-iam/* ./pull-request-edit
+              jq '.role_name = "airflow_test_dag_role"' ./pr-with-iam/deploy.json > ./pull-request-edit/deploy.json
+              jq '.Statement += [{"Sid": "denyall","Action": ["*"],"Effect": "Deny","Resource": ["*"]}]' ./pr-with-iam/iam_policy.json > ./pull-request-edit/iam_policy.json
+              cat ./pull-request-edit/deploy.json
+        outputs:
+          - name: pull-request-edit
+  # test creating the IAM role
   - aggregate:
     - task: create-iam-role-name
       file: common-tasks/put-iam-role.yaml
@@ -231,39 +245,9 @@ jobs:
           status: success
           context: unittests
     - task: run-syntax
-      privileged: true
-      config:
-        platform: linux
-        image_resource:
-          type: docker-image
-          source:
-            repository: amidos/dcind
-        inputs:
-          - name: image
-        run:
-          path: sh
-          args:
-            - -ec
-            - |
-              source /docker-lib.sh
-              start_docker
-              docker load -i image/image.tar
-              # Try importing files in base dir to check for syntax errors
-              docker run --entrypoint "" dag/test:latest python -c "
-              import os
-              import sys
-              from importlib import import_module
-              prefix = os.getcwd()
-              print(f'Working directory: {prefix}')
-              for dirpath, dirnames, filenames in os.walk(prefix):
-                  trimmed_mods = [f[:f.find('.py')] for f in filenames if not f.startswith('__') and f.find('.py') > 0]
-                  for m in trimmed_mods:
-                      if dirpath not in sys.path:
-                          sys.path.insert(0, dirpath)
-                      mod = dirpath.replace(prefix + '/', '').replace('/', '.') + '.' + m
-                      print(f'importing: {mod}')
-                      import_module(mod)
-              "
+      file: common-tasks/python-flake8.yaml
+      input_mapping:
+        source: pull-request
       on_failure:
         put: pull-request
         attempts: 3
