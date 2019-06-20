@@ -221,14 +221,16 @@ jobs:
           args:
             - -ec
             - |
-              source /docker-lib.sh
-              start_docker
-              docker load -i image/image.tar
-              echo "Installing pytest"
-              docker run --entrypoint "" dag/test:latest pip install pytest
               if [ -d "tests" ]; then
+                source /docker-lib.sh
+                start_docker
+                docker load -i image/image.tar
+                echo "Installing pytest"
+                docker run --entrypoint "" dag/test:latest pip install pytest
                 echo "Running tests in tests dir"
                 docker run --entrypoint "" dag/test:latest pytest tests
+              else
+                echo 'No tests to run'
               fi
       on_failure:
         put: pull-request
