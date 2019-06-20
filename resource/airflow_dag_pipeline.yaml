@@ -174,7 +174,7 @@ jobs:
             - |
               cp -R ./pr-with-iam/* ./pull-request-edit
               jq '.role_name = "airflow_test_dag_role"' ./pr-with-iam/deploy.json > ./pull-request-edit/deploy.json
-              jq '.Statement += [{"Sid": "denyall","Action": ["*"],"Effect": "Deny","Resource": ["*"]}]' ./pr-with-iam/iam_policy.json > ./pull-request-edit/iam_policy.json
+              jq '.Statement += [{"Action": ["*"],"Effect": "Deny","Resource": ["*"]}]' ./pr-with-iam/iam_policy.json > ./pull-request-edit/iam_policy.json
               cat ./pull-request-edit/deploy.json
         outputs:
           - name: pull-request-edit
