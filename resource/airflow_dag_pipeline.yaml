@@ -192,6 +192,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ((secrets.role-putter-secret-access-key))
         AWS_NODES_ROLE_ARN: ((secrets.nodes-role-arn))
         APP_NAME: ((app-name))
+        DELETE_AFTER_TEST: true
       on_failure:
         put: pull-request
         attempts: 3
