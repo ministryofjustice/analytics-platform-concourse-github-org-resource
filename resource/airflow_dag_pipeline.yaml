@@ -217,12 +217,13 @@ jobs:
             repository: amidos/dcind
         inputs:
           - name: image
+          - name: pull-request
         run:
           path: sh
           args:
             - -ec
             - |
-              if [ -d "tests" ]; then
+              if [ -d "pull-request/tests" ]; then
                 source /docker-lib.sh
                 start_docker
                 docker load -i image/image.tar
