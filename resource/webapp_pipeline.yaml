@@ -18,6 +18,7 @@ jobs:
     file: common-tasks/parse-deploy-file.yaml
     params:
       IPS_DOM1: ((secrets.ip-dom1))
+      IPS_DIGITAL: ((secrets.ip-digital))
       IPS_QUANTUM: ((secrets.ip-quantum))
       IPS_102PF_WIFI: ((secrets.ip-102pf))
 
