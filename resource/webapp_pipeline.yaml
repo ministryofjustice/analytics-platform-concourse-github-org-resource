@@ -2,48 +2,49 @@
 jobs:
 - name: deploy
   plan:
+  - aggregate:
+    - get: release
+      trigger: true
+      params:
+        include_source_tarball: true
 
-  - get: release
-    trigger: true
-    params:
-      include_source_tarball: true
-
-  - get: common-tasks
+    - get: common-tasks
 
   - task: webapp-source
     file: common-tasks/extract-release-tarball.yaml
     output_mapping: {extracted: webapp-source}
+  - aggregate:
+    - task: deploy-params
+      file: common-tasks/parse-deploy-file.yaml
+      params:
+        IPS_DOM1: ((secrets.ip-dom1))
+        IPS_DIGITAL: ((secrets.ip-digital))
+        IPS_QUANTUM: ((secrets.ip-quantum))
+        IPS_102PF_WIFI: ((secrets.ip-102pf))
 
-  - task: deploy-params
-    file: common-tasks/parse-deploy-file.yaml
-    params:
-      IPS_DOM1: ((secrets.ip-dom1))
-      IPS_DIGITAL: ((secrets.ip-digital))
-      IPS_QUANTUM: ((secrets.ip-quantum))
-      IPS_102PF_WIFI: ((secrets.ip-102pf))
+    - put: webapp-docker-repo
 
-  - put: webapp-docker-repo
+  - aggregate:
+    - task: webapp-docker-image
+      privileged: true
+      file: common-tasks/webapp-docker-image.yaml
+      params:
+        AWS_ACCESS_KEY_ID: ((secrets.ecr-access-key-id))
+        AWS_SECRET_ACCESS_KEY: ((secrets.ecr-secret-access-key))
 
-  - task: webapp-docker-image
-    privileged: true
-    file: common-tasks/webapp-docker-image.yaml
-    params:
-      AWS_ACCESS_KEY_ID: ((secrets.ecr-access-key-id))
-      AWS_SECRET_ACCESS_KEY: ((secrets.ecr-secret-access-key))
+    - put: webapp-auth0-client
 
-  - put: webapp-auth0-client
+    - task: iam-role-name
+      file: common-tasks/get-iam-role.yaml
+      output_mapping: {output: aws}
+      params:
+        ORG_NAME: ((github-org))
+        REPO_NAME: ((github-repo))
+        CPANEL_API_PASSWORD: ((secrets.cpanel-api-password))
+        CPANEL_API_URL: ((secrets.cpanel-api-url))
+        CPANEL_API_USER: ((secrets.cpanel-api-user))
 
-  - task: iam-role-name
-    file: common-tasks/get-iam-role.yaml
-    output_mapping: {output: aws}
-    params:
-      ORG_NAME: ((github-org))
-      REPO_NAME: ((github-repo))
-      CPANEL_API_PASSWORD: ((secrets.cpanel-api-password))
-      CPANEL_API_URL: ((secrets.cpanel-api-url))
-      CPANEL_API_USER: ((secrets.cpanel-api-user))
-
-  - get: config-repo
+    - get: config-repo
 
   - put: webapp-helm-release
     params:
