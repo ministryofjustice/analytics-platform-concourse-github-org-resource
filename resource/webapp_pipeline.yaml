@@ -13,6 +13,8 @@ jobs:
   - task: webapp-source
     file: common-tasks/extract-release-tarball.yaml
     output_mapping: {extracted: webapp-source}
+  - task: lint-deploy
+    file: common-tasks/validate-deploy-file.yaml
   - aggregate:
     - task: deploy-params
       file: common-tasks/parse-deploy-file.yaml
