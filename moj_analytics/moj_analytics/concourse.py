@@ -5,14 +5,13 @@ import sys
 
 
 class Resource(object):
-
     def __init__(self, fn):
         self.fn = fn
 
         self.action = os.path.basename(sys.argv[0]).lower()
 
         self.args = []
-        if self.action in ('in', 'out'):
+        if self.action in ("in", "out"):
             self.args.append(sys.argv[1])
 
         self.kwargs = json.loads(sys.stdin.read())

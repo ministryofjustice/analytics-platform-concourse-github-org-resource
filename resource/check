@@ -2,25 +2,25 @@
 
 from moj_analytics.concourse import Resource
 
-from common import get_all, get_org, pushed_at
+from common import get_org, pushed_at, get_all_repos
 
 
 @Resource
 def get_versions(source={}, version=None):
     print(f'Fetching {source["name"]} org', flush=True)
-    org = get_org(**source)
 
-    print('Fetching org repos', flush=True)
-    repos = get_all(org['repos_url'], **source)
+    print("Fetching org repos", flush=True)
+    repos = get_all_repos(source)
 
+    print(f"{len(repos)} repos found", flush=True)
     timestamps = sorted(set(map(pushed_at, repos)))
 
-    if version is not None and version.get('ref') != 'none':
-        version = int(version['ref'])
+    if version is not None and version.get("ref") != "none":
+        version = int(version["ref"])
         timestamps = filter(lambda ts: ts >= version, timestamps)
 
-    return [{'ref': str(ts)} for ts in timestamps]
+    return [{"ref": str(ts)} for ts in timestamps]
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     get_versions()
