@@ -1,8 +1,11 @@
+import itertools
 from datetime import timezone
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
-from dateutil.parser import parse
 import requests
+from dateutil.parser import parse
+
+import queries
 
 
 def get_all(url, **kwargs):
@@ -15,22 +18,32 @@ def get_all(url, **kwargs):
     while url:
         response = github_api_request(url, **kwargs)
         items += response.json()
-        links = parse_links(response.headers.get('Link', ''))
-        url = links.get('next')
+        links = parse_links(response.headers.get("Link", ""))
+        url = links.get("next")
     return items
 
 
 def get_org(name, **kwargs):
-    return github_api_request(
-        f'https://api.github.com/orgs/{name}', **kwargs).json()
+    return github_api_request(f"https://api.github.com/orgs/{name}", **kwargs).json()
 
 
 def github_api_request(url, access_token, skip_ssl_verification=False, **kw):
     url = update_query_params(url, per_page=100)
-    return requests.get(url, verify=(not skip_ssl_verification), headers={
-        'Authorization': f'token {access_token}'}
+    return requests.get(
+        url,
+        verify=(not skip_ssl_verification),
+        headers={"Authorization": f"token {access_token}"},
     )
-
+def graphql_client(access_token):
+    def graphql_query(q):
+        resp = requests.post(
+            "https://api.github.com/graphql",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={"query": q}
+        )
+        resp.raise_for_status()
+        return resp.json()
+    return graphql_query
 
 def update_query_params(url, **kwargs):
     """
@@ -66,13 +79,33 @@ def parse_links(s):
     'https://api.github.com/repos?page=5'
     """
     links = {}
-    for link in s.split(','):
-        url, rel = link.strip().split(';')
-        url = url.strip(' <>')
-        rel = rel.strip().replace('rel=', '').strip('"')
+    for link in s.split(","):
+        url, rel = link.strip().split(";")
+        url = url.strip(" <>")
+        rel = rel.strip().replace("rel=", "").strip('"')
         links[rel] = url
     return links
 
 
 def pushed_at(r):
-    return int(parse(r['pushed_at']).replace(tzinfo=timezone.utc).timestamp())
+    return int(parse(r["pushedAt"]).replace(tzinfo=timezone.utc).timestamp())
+
+
+def get_all_repos(source):
+    client = graphql_client(source["access_token"])
+    all_repos = []
+    repos = client(queries.repos(source["name"]))
+    all_repos.append(repos)
+    while repos["data"]["organization"]["repositories"]["pageInfo"][
+        "hasNextPage"]:
+        cursor = f'"{repos["data"]["organization"]["repositories"]["pageInfo"]["endCursor"]}"'
+        repos = client(queries.repos(source["name"], after=cursor))
+        all_repos.append(repos)
+    repo_list = [
+        y["node"]
+        for y in itertools.chain.from_iterable(
+            [x["data"]["organization"]["repositories"]["edges"] for x in
+             all_repos]
+        )
+    ]
+    return repo_list

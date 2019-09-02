@@ -6,111 +6,108 @@ import json
 from fly import Fly
 from moj_analytics.concourse import Resource
 
-from common import get_all, get_org, github_api_request, pushed_at
+from common import pushed_at, get_all_repos
 
-
-INVALID_CHARS = re.compile(r'[^-a-z0-9]')
-SURROUNDING_HYPHENS = re.compile(r'^-*|-*$')
+INVALID_CHARS = re.compile(r"[^-a-z0-9]")
+SURROUNDING_HYPHENS = re.compile(r"^-*|-*$")
 
 
 class ansi:
-    green = '\x1b[92m'
-    grey = '\x1b[90m'
-    reset = '\x1b[0m'
+    green = "\x1b[92m"
+    grey = "\x1b[90m"
+    reset = "\x1b[0m"
 
 
 @Resource
 def create_pipelines(src_dir, source={}, params={}):
-    print('Logging in to Concourse')
-    fly = Fly(
-        concourse_url=source.get('concourse_url')
-    )
+    print("Logging in to Concourse")
+    fly = Fly(concourse_url=source.get("concourse_url"))
     fly.get_fly()
     fly.login(
-        username=source.get('username'),
-        password=source.get('password'),
-        team_name=source.get('team_name')
+        username=source.get("username"),
+        password=source.get("password"),
+        team_name=source.get("team_name"),
     )
 
-    print('Fetching existing pipelines', flush=True)
+    print("Fetching existing pipelines", flush=True)
     pipelines = get_pipelines(fly)
-    print(f'Found {len(pipelines)} pipelines', flush=True)
+    print(f"Found {len(pipelines)} pipelines", flush=True)
 
     print(f'Fetching {source["name"]} org', flush=True)
-    org = get_org(**source)
 
-    print('Fetching org repos', flush=True)
-    repos = get_all(org['repos_url'], **source)
+    print("Fetching org repos", flush=True)
+    repos = get_all_repos(source)
 
     for repo in repos:
         if buildfile_exists(repo, **source):
-            if repo['name'] in pipelines:
-                print(
-                    f'Pipeline exists for {repo["name"]}',
-                    flush=True)
+            if repo["name"] in pipelines:
+                print(f'Pipeline exists for {repo["name"]}', flush=True)
             else:
                 print(
                     (
-                        f'{ansi.green}Creating pipeline for '
+                        f"{ansi.green}Creating pipeline for "
                         f'{repo["name"]}{ansi.reset}'
                     ),
-                    flush=True)
+                    flush=True,
+                )
 
             pipeline_type = buildfile_type(repo, **source)
 
             fly_set_pipeline(fly, repo, pipeline_type=pipeline_type, **source)
 
         else:
-            print(
-                f'{ansi.grey}No buildfile for {repo["name"]}{ansi.reset}',
-                flush=True)
+            print(f'{ansi.grey}No buildfile for {repo["name"]}{ansi.reset}', flush=True)
 
     timestamps = sorted(set(map(pushed_at, repos)))
 
-    return {'version': {'ref': str(timestamps[-1])}}
+    return {"version": {"ref": str(timestamps[-1])}}
 
 
 def get_pipelines(fly):
-    return [str(p).split(' ')[0] for p in
-            fly.run('pipelines').stdout.decode('utf-8').splitlines()]
+    return [
+        str(p).split(" ")[0]
+        for p in fly.run("pipelines").stdout.decode("utf-8").splitlines()
+    ]
 
 
 def buildfile_exists(repo, **kwargs):
-    url = repo['contents_url'].replace('{+path}', 'deploy.json')
-    return github_api_request(url, **kwargs).status_code != 404
+    return repo["deploy"] != None
 
 
 def buildfile_type(repo, **kwargs):
-    url = repo['contents_url'].replace('{+path}', 'deploy.json')
-    metadata = github_api_request(url, **kwargs).json()
-    download_url = metadata['download_url']
-    deploy_type = 'webapp'
+    deploy_type = "webapp"
     try:
-        deploy_file = github_api_request(download_url, **kwargs).json()
-        deploy_type = deploy_file.get('type', 'webapp')
+        deploy_file = json.loads(repo["deploy"]["body"])
+        deploy_type = deploy_file.get("type", "webapp")
     except json.decoder.JSONDecodeError:  # handle malformed deploy.json
         # if json is malformed just assume it's a webapp deploy
         pass
     return deploy_type
 
 
-def fly_set_pipeline(fly, repo, team_name, pipeline_type='webapp', **kwargs):
-    app_name = normalize(repo['name'])
+def fly_set_pipeline(fly, repo, team_name, pipeline_type="webapp", **kwargs):
+    app_name = normalize(repo["name"])
     fly.run(
-        'set-pipeline',
-        '-p', repo["name"],
-        '-c', f'/opt/resource/{pipeline_type}_pipeline.yaml',
-        '-v', f'app-name={app_name}',
-        '-v', f'github-org={kwargs["name"]}',
-        '-v', f'github-repo={repo["name"]}',
-        '-n')
+        "set-pipeline",
+        "-p",
+        repo["name"],
+        "-c",
+        f"/opt/resource/{pipeline_type}_pipeline.yaml",
+        "-v",
+        f"app-name={app_name}",
+        "-v",
+        f'github-org={kwargs["name"]}',
+        "-v",
+        f'github-repo={repo["name"]}',
+        "-n",
+    )
 
 
 def normalize(name):
     name = name.lower()
-    name = SURROUNDING_HYPHENS.sub('', INVALID_CHARS.sub('-', name))
+    name = SURROUNDING_HYPHENS.sub("", INVALID_CHARS.sub("-", name))
     return name[:50]
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     create_pipelines()
