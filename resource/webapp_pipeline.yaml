@@ -23,6 +23,7 @@ jobs:
         IPS_DIGITAL: ((secrets.ip-digital))
         IPS_QUANTUM: ((secrets.ip-quantum))
         IPS_102PF_WIFI: ((secrets.ip-102pf))
+        IPS_TURING: ((secrets.ip-turing))
 
     - put: webapp-docker-repo
 
