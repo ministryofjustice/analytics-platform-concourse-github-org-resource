@@ -28,6 +28,7 @@ jobs:
       IPS_DOM1: ((secrets.ip-dom1))
       IPS_QUANTUM: ((secrets.ip-quantum))
       IPS_102PF_WIFI: ((secrets.ip-102pf))
+      IPS_TURING: ((secrets.ip-turing))
 
   - put: dag-docker-repo
 
