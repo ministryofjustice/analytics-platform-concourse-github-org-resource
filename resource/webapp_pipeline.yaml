@@ -64,6 +64,11 @@ jobs:
       - { key: WebApp.Image.Tag, path: release/tag }
       - { key: AWS.IAMRole, path: aws/iam_role_name }
       - { key: CookieSecret, value: ((secrets.cookie-secret)) }
+  - try:
+      put: deployment-status
+      params:
+        kubectl: rollout status deployment/((app-name))-webapp -w --timeout=1h
+        wait_until_ready: 0
 
 resources:
 - name: config-repo
@@ -116,6 +121,14 @@ resources:
     - name: mojanalytics
       url: http://moj-analytics-helm-repo.s3-website-eu-west-1.amazonaws.com
 
+- name: deployment-status
+  type: kubernetes
+  source:
+    server: ((secrets.kubernetes-api-url))
+    namespace: apps-prod
+    token: ((secrets.kubernetes-token))
+    insecure_skip_tls_verify: true
+
 resource_types:
 - name: auth0-client
   type: docker-image
@@ -133,4 +146,10 @@ resource_types:
   type: docker-image
   source:
     repository: linkyard/concourse-helm-resource
-    tag: 2.9.1-3
+    tag: 2.13.1
+
+- name: kubernetes
+  type: docker-image
+  source:
+    repository: zlabjp/kubernetes-resource
+    tag: "1.15"
