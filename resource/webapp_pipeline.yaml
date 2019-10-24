@@ -30,6 +30,7 @@ jobs:
         AWS_DEFAULT_REGION: ((secrets.aws-region))
         AWS_ACCESS_KEY_ID: ((secrets.parameter-access-key-id))
         AWS_SECRET_ACCESS_KEY: ((secrets.parameter-secret-access-key))
+        APP_NAME: ((app-name))
 
     - put: webapp-docker-repo
 
