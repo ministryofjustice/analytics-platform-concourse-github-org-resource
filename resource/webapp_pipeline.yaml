@@ -24,6 +24,11 @@ jobs:
         IPS_QUANTUM: ((secrets.ip-quantum))
         IPS_102PF_WIFI: ((secrets.ip-102pf))
         IPS_TURING: ((secrets.ip-turing))
+    - task: parameter-store
+      file: common-tasks/param-store-env-vars.yaml
+      params:
+        AWS_ACCESS_KEY_ID: ((secrets.ecr-access-key-id))
+        AWS_SECRET_ACCESS_KEY: ((secrets.ecr-secret-access-key))
 
     - put: webapp-docker-repo
 
@@ -56,6 +61,7 @@ jobs:
       - webapp-auth0-client/credentials.yaml
       - config-repo/chart-env-config/alpha/webapp.yml
       - deploy-params/overrides.yaml
+      - parameter-store/env-vars.yaml
       override_values:
       - { key: WebApp.Name, value: ((app-name)) }
       - { key: WebApp.BaseHost, value: ((secrets.app-domain)) }
