@@ -27,8 +27,9 @@ jobs:
     - task: parameter-store
       file: common-tasks/param-store-env-vars.yaml
       params:
-        AWS_ACCESS_KEY_ID: ((secrets.ecr-access-key-id))
-        AWS_SECRET_ACCESS_KEY: ((secrets.ecr-secret-access-key))
+        AWS_DEFAULT_REGION: ((secrets.aws-region))
+        AWS_ACCESS_KEY_ID: ((secrets.parameter-access-key-id))
+        AWS_SECRET_ACCESS_KEY: ((secrets.parameter-secret-access-key))
 
     - put: webapp-docker-repo
 
