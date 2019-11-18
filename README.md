@@ -1,3 +1,5 @@
+[![Docker Repository on Quay](https://quay.io/repository/mojanalytics/github-org-resource/status "Docker Repository on Quay")](https://quay.io/repository/mojanalytics/github-org-resource)
+
 # Github Organization Resource
 
 Provides a Concourse resource for Github Organizations. Used to create
