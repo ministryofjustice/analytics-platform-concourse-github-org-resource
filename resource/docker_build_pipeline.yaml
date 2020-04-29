@@ -66,7 +66,6 @@ jobs:
           args:
             - -ec
             - |
-              jq -r '.[2] | .value' $(pwd)/pull-request/.git/resource/metadata.json > $(pwd)/pull-request/tag
               jq -n "{
                 source: {
                   repository: \"$(cat docker-repo/uri)\",
@@ -75,7 +74,7 @@ jobs:
                 },
                 params: {
                   build: \"$(pwd)/pull-request\",
-                  tag: \"$(pwd)/pull-request/tag\"
+                  tag: \"$(pwd)/pull-request/.git/resource/head_name\"
                 }
               }" | /opt/resource/out docker-image
       on_failure:
