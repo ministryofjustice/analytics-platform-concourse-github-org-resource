@@ -142,7 +142,7 @@ resource_types:
   type: docker-image
   source:
     repository: quay.io/mojanalytics/concourse-auth0-resource
-    tag: v2.0.1
+    tag: v2.0.2
 
 - name: ecr-repo
   type: docker-image
