@@ -18,64 +18,71 @@ TMP_DIR = os.path.join(tempfile.gettempdir(), "pipelines")
 os.makedirs(TMP_DIR, exist_ok=True)
 
 
-def concourse_login():
-    """fly login"""
+class Concourse():
 
-    subprocess.run([
-        DEFAULT_FLY_BIN, "login",
-        "-c", DEFAULT_CONCOURSE_URL,
-        "-t", DEFAULT_TARGET,
-        "-n", DEFAULT_TEAM_NAME,
-    ])
+    def __init__(self, fly_bin, fly_target, concourse_url, team_name):
+        self.fly_bin = fly_bin
+        self.fly_target = fly_target
+        self.concourse_url = concourse_url
+        self.team_name = team_name
 
+    def login(self):
+        """fly login"""
 
-def get_pipelines():
-    """fly pipelines"""
+        subprocess.run([
+            self.fly_bin, "login",
+            "-c", self.concourse_url,
+            "-t", self.fly_target,
+            "-n", self.team_name,
+        ])
 
-    pipeline_names = []
+    def get_pipelines(self):
+        """fly pipelines"""
 
-    # fly pipelines
-    c1 = subprocess.Popen([
-            DEFAULT_FLY_BIN,
-            "-t", DEFAULT_TARGET,
-            "pipelines"
-        ], stdout=subprocess.PIPE)
-    output = c1.communicate()[0].decode("utf-8")
+        pipeline_names = []
 
-    # extract pipeline names from first column
-    lines = output.split('\n')
-    for line in lines:
-        # ignore other pipeline information such as
-        # whether they're paused or public
-        pipeline_name = line.split(' ')[0]
-        if pipeline_name:
-            pipeline_names.append(pipeline_name)
+        # fly pipelines
+        c1 = subprocess.Popen([
+                self.fly_bin,
+                "-t", self.fly_target,
+                "pipelines"
+            ], stdout=subprocess.PIPE)
+        output = c1.communicate()[0].decode("utf-8")
 
-    return pipeline_names
+        # extract pipeline names from first column
+        lines = output.split('\n')
+        for line in lines:
+            # ignore other pipeline information such as
+            # whether they're paused or public
+            pipeline_name = line.split(' ')[0]
+            if pipeline_name:
+                pipeline_names.append(pipeline_name)
 
-
-def get_pipeline(name):
-    """fly get-pipeline"""
-
-    cmd = subprocess.run([
-        DEFAULT_FLY_BIN, "get-pipeline",
-        "-t", DEFAULT_TARGET,
-        "-p", name,
-        "--json"
-    ], capture_output=True)
-
-    return json.loads(cmd.stdout)
+        return pipeline_names
 
 
-def set_pipeline(name, config_path):
-    """fly set-pipeline"""
+    def get_pipeline(self, name):
+        """fly get-pipeline"""
 
-    cmd = subprocess.run([
-        DEFAULT_FLY_BIN, "set-pipeline",
-        "-t", DEFAULT_TARGET,
-        "-p", name,
-        "-c", config_path,
-    ])
+        cmd = subprocess.run([
+            self.fly_bin, "get-pipeline",
+            "-t", self.fly_target,
+            "-p", name,
+            "--json"
+        ], capture_output=True)
+
+        return json.loads(cmd.stdout)
+
+
+    def set_pipeline(self, name, config_path):
+        """fly set-pipeline"""
+
+        cmd = subprocess.run([
+            self.fly_bin, "set-pipeline",
+            "-t", self.fly_target,
+            "-p", name,
+            "-c", config_path,
+        ])
 
 
 def update_resource_tag(pipeline, resource_name, new_tag):
@@ -85,18 +92,38 @@ def update_resource_tag(pipeline, resource_name, new_tag):
             break
 
 
-if __name__ == "__main__":
-    concourse_login()
-    pipelines = get_pipelines()
+@click.command()
+@click.option("-b", "--fly-binary-path", default="/usr/local/bin/fly", help="path to the fly binary (the Concourse cli)", prompt=True)
+@click.option("-c", "--concourse-url", default="https://concourse.services.dev.mojanalytics.xyz", help="URL of Concourse", prompt=True)
+@click.option("-t", "--fly-target", default="dev-main", help="Concourse's fly target name", prompt=True)
+@click.option("-n", "--concourse-team-name", default="main", help="Concourse team where the pipelines to update are", prompt=True)
+@click.option("-r", "--resource-name", required=True, help="Name of the custom resource to update. Note this is the name used in the pipelines (e.g. 'auth0-client')", prompt=True)
+@click.option("-v", "--resource-tag", required=True, help="New version/tag of the resource", prompt=True)
+@click.option("-d", "--dry-run", is_flag=True, help="When true, will not update the upstream Concourse pipeline")
+def main(fly_binary_path, concourse_url, fly_target, concourse_team_name, resource_name, resource_tag, dry_run):
+    concourse = Concourse(
+        fly_bin=fly_binary_path,
+        fly_target=fly_target,
+        concourse_url=concourse_url,
+        team_name=concourse_team_name,
+    )
+
+    concourse.login()
+    pipelines = concourse.get_pipelines()
 
     for pipeline_name in pipelines:
         click.echo(f"updating pipeline '{pipeline_name}'...")
-        pipeline = get_pipeline(pipeline_name)
+        pipeline = concourse.get_pipeline(pipeline_name)
 
-        update_resource_tag(pipeline, "auth0-client", "v2.0.2")
+        update_resource_tag(pipeline, resource_name, resource_tag)
 
         pipeline_path = os.path.join(TMP_DIR, f"{pipeline_name}_UPDATED.json")
         with open(pipeline_path, "w") as file:
             json.dump(pipeline, file)
 
-        set_pipeline(pipeline_name, pipeline_path)
+        if not dry_run:
+            concourse.set_pipeline(pipeline_name, pipeline_path)
+
+
+if __name__ == "__main__":
+    main()
