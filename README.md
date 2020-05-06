@@ -75,11 +75,11 @@ jobs:
 ```
 
 ## Release process
-Change this resource is not enough to release it.
+Changing this resource is not enough to release it.
 A new release tag needs to be created and Concourse
 needs to be instructed to use it.
 
-Here the steps:
+Here are the steps:
 
 1. Create a [GitHub release](https://github.com/ministryofjustice/analytics-platform-concourse-github-org-resource/releases)
 2. Update the config (`concourse-org-pipeline.yaml`)
@@ -130,10 +130,10 @@ Options:
 Let's say for example that you want to update all the
 pipelines to use [`concourse-auth0-resource` `v2.0.2`](https://github.com/ministryofjustice/analytics-platform-concourse-auth0-client-resource/releases/tag/v2.0.2).
 
-First you need to find out how this resource is called
+First you need to find out what this resource is called
 in the pipeline, in this case if you check the `webapp`
 pipeline definition, in the `resource_types` section
-you'll see that this resource is instanciated with the
+you'll see that this resource is instantiated with the
 name `auth0-client`, this will be the value you'll pass
 for the `resource-name` argument of the script.
 
