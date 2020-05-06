@@ -8,12 +8,6 @@ import subprocess
 import tempfile
 
 
-DEFAULT_FLY_BIN = "/usr/local/bin/fly"
-DEFAULT_CONCOURSE_URL = "https://concourse.services.dev.mojanalytics.xyz"
-DEFAULT_TEAM_NAME = "main"
-DEFAULT_TARGET = "update-pipelines-script"
-
-
 TMP_DIR = os.path.join(tempfile.gettempdir(), "pipelines")
 os.makedirs(TMP_DIR, exist_ok=True)
 
@@ -74,15 +68,20 @@ class Concourse():
         return json.loads(cmd.stdout)
 
 
-    def set_pipeline(self, name, config_path):
+    def set_pipeline(self, name, config_path, non_interactive=True):
         """fly set-pipeline"""
 
-        cmd = subprocess.run([
+        set_pipeline_args = [
             self.fly_bin, "set-pipeline",
             "-t", self.fly_target,
             "-p", name,
             "-c", config_path,
-        ])
+        ]
+
+        if non_interactive:
+            set_pipeline_args.append("--non-interactive")
+
+        subprocess.run(set_pipeline_args)
 
 
 def update_resource_tag(pipeline, resource_name, new_tag):
@@ -100,7 +99,10 @@ def update_resource_tag(pipeline, resource_name, new_tag):
 @click.option("-r", "--resource-name", required=True, help="Name of the custom resource to update. Note this is the name used in the pipelines (e.g. 'auth0-client')", prompt=True)
 @click.option("-v", "--resource-tag", required=True, help="New version/tag of the resource", prompt=True)
 @click.option("-d", "--dry-run", is_flag=True, help="When true, will not update the upstream Concourse pipeline")
-def main(fly_binary_path, concourse_url, fly_target, concourse_team_name, resource_name, resource_tag, dry_run):
+@click.option("-i", "--interactive", is_flag=True, default=False, help="Run fly set-pipeline interactively")
+def main(fly_binary_path, concourse_url, fly_target, concourse_team_name, resource_name, resource_tag, dry_run, interactive):
+    non_interactive = not interactive
+
     concourse = Concourse(
         fly_bin=fly_binary_path,
         fly_target=fly_target,
@@ -113,7 +115,6 @@ def main(fly_binary_path, concourse_url, fly_target, concourse_team_name, resour
 
     with click.progressbar(pipelines) as pbar:
         for pipeline_name in pbar:
-            click.echo(f" updating pipeline '{pipeline_name}'...")
             pipeline = concourse.get_pipeline(pipeline_name)
 
             update_resource_tag(pipeline, resource_name, resource_tag)
@@ -123,7 +124,11 @@ def main(fly_binary_path, concourse_url, fly_target, concourse_team_name, resour
                 json.dump(pipeline, file)
 
             if not dry_run:
-                concourse.set_pipeline(pipeline_name, pipeline_path)
+                concourse.set_pipeline(
+                    pipeline_name,
+                    pipeline_path,
+                    non_interactive=non_interactive,
+                )
 
 
 if __name__ == "__main__":
