@@ -111,18 +111,19 @@ def main(fly_binary_path, concourse_url, fly_target, concourse_team_name, resour
     concourse.login()
     pipelines = concourse.get_pipelines()
 
-    for pipeline_name in pipelines:
-        click.echo(f"updating pipeline '{pipeline_name}'...")
-        pipeline = concourse.get_pipeline(pipeline_name)
+    with click.progressbar(pipelines) as pbar:
+        for pipeline_name in pbar:
+            click.echo(f" updating pipeline '{pipeline_name}'...")
+            pipeline = concourse.get_pipeline(pipeline_name)
 
-        update_resource_tag(pipeline, resource_name, resource_tag)
+            update_resource_tag(pipeline, resource_name, resource_tag)
 
-        pipeline_path = os.path.join(TMP_DIR, f"{pipeline_name}_UPDATED.json")
-        with open(pipeline_path, "w") as file:
-            json.dump(pipeline, file)
+            pipeline_path = os.path.join(TMP_DIR, f"{pipeline_name}_UPDATED.json")
+            with open(pipeline_path, "w") as file:
+                json.dump(pipeline, file)
 
-        if not dry_run:
-            concourse.set_pipeline(pipeline_name, pipeline_path)
+            if not dry_run:
+                concourse.set_pipeline(pipeline_name, pipeline_path)
 
 
 if __name__ == "__main__":
