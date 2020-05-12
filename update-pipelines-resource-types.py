@@ -85,6 +85,9 @@ class Concourse():
 
 
 def update_resource_tag(pipeline, resource_name, new_tag):
+    if not pipeline.get("resource_types"):
+        return
+
     for t in pipeline.get("resource_types", []):
         if t["name"] == resource_name:
             t["source"]["tag"] = new_tag
