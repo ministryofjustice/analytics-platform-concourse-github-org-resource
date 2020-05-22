@@ -229,7 +229,7 @@ jobs:
                 start_docker
                 docker load -i image/image.tar
                 echo "Installing pytest and running tests in tests directory"
-                docker run --entrypoint "" dag/test:latest pip install pytest && pytest tests
+                docker run --entrypoint "" dag/test:latest bash -c "pip install pytest && pytest tests"
               else
                 echo 'No tests to run'
               fi
