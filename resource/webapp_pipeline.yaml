@@ -153,11 +153,11 @@ resource_types:
 - name: helm
   type: docker-image
   source:
-    repository: linkyard/concourse-helm-resource
+    repository: 593291632749.dkr.ecr.eu-west-1.amazonaws.com/concourse-helm-resource
     tag: 2.13.1
 
 - name: kubernetes
   type: docker-image
   source:
-    repository: zlabjp/kubernetes-resource
+    repository: 593291632749.dkr.ecr.eu-west-1.amazonaws.com/concourse-kubernetes-resource
     tag: "1.15"
