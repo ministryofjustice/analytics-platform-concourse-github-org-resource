@@ -51,7 +51,7 @@ jobs:
         image_resource:
           type: docker-image
           source:
-            repository: concourse/docker-image-resource
+            repository: 593291632749.dkr.ecr.eu-west-1.amazonaws.com/concourse-docker-image-resource
             tag: 'pr-227'
         inputs:
           - name: docker-repo
@@ -133,4 +133,4 @@ resource_types:
 - name: pull-request
   type: docker-image
   source:
-    repository: teliaoss/github-pr-resource
+    repository: 593291632749.dkr.ecr.eu-west-1.amazonaws.com/concourse-github-pr-resource
