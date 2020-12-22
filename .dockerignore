@@ -1,2 +1,2 @@
 requirements.dev.txt
-update-pipelines-resource-types.py
+update-pipelines.py

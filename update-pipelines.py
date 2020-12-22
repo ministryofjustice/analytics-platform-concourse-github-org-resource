@@ -14,21 +14,9 @@ os.makedirs(TMP_DIR, exist_ok=True)
 
 class Concourse():
 
-    def __init__(self, fly_bin, fly_target, concourse_url, team_name):
+    def __init__(self, fly_bin, fly_target):
         self.fly_bin = fly_bin
         self.fly_target = fly_target
-        self.concourse_url = concourse_url
-        self.team_name = team_name
-
-    def login(self):
-        """fly login"""
-
-        subprocess.run([
-            self.fly_bin, "login",
-            "-c", self.concourse_url,
-            "-t", self.fly_target,
-            "-n", self.team_name,
-        ])
 
     def get_pipelines(self):
         """fly pipelines"""
@@ -94,39 +82,49 @@ def update_resource_tag(pipeline, resource_name, new_tag):
             break
 
 
+def update_helm_stable_repo_(pipeline, stable_repo):
+    if not pipeline.get("resources"):
+        return
+
+    for t in pipeline.get("resources", []):
+        if t["name"] == "webapp-helm-release":
+            t["source"]["stable_repo"] = stable_repo
+            break
+
 @click.command()
-@click.option("-b", "--fly-binary-path", default="/usr/local/bin/fly", help="path to the fly binary (the Concourse cli)", prompt=True)
-@click.option("-c", "--concourse-url", default="https://concourse.services.dev.mojanalytics.xyz", help="URL of Concourse", prompt=True)
-@click.option("-t", "--fly-target", default="dev-main", help="Concourse's fly target name", prompt=True)
-@click.option("-n", "--concourse-team-name", default="main", help="Concourse team where the pipelines to update are", prompt=True)
-@click.option("-r", "--resource-name", required=True, help="Name of the custom resource to update. Note this is the name used in the pipelines (e.g. 'auth0-client')", prompt=True)
-@click.option("-v", "--resource-tag", required=True, help="New version/tag of the resource", prompt=True)
-@click.option("-d", "--dry-run", is_flag=True, help="When true, will not update the upstream Concourse pipeline")
+@click.option("-b", "--fly-binary-path", default="/usr/local/bin/fly", help="path to the fly binary (the Concourse cli)")
+@click.option("-t", "--fly-target", required=True, default="mojap-dev", help="Concourse's fly target name", prompt=True)
+@click.option("--update-resource", help="To update a custom resource, provide the name of the custom resource to update, as used in the pipelines and the new version/tag of the resource (e.g. 'auth0-client=1.4')")
+@click.option("--update-helm-stable-repo", help="To update the helm stable repo, provide the name of the repo")
+@click.option("-d", "--dry-run", is_flag=True, help="When true, will not write the changes to the upstream Concourse pipeline")
 @click.option("-i", "--interactive", is_flag=True, default=False, help="Run fly set-pipeline interactively")
-def main(fly_binary_path, concourse_url, fly_target, concourse_team_name, resource_name, resource_tag, dry_run, interactive):
+def main(fly_binary_path, fly_target, update_resource, update_helm_stable_repo, dry_run, interactive):
     non_interactive = not interactive
 
     concourse = Concourse(
         fly_bin=fly_binary_path,
         fly_target=fly_target,
-        concourse_url=concourse_url,
-        team_name=concourse_team_name,
     )
 
-    concourse.login()
     pipelines = concourse.get_pipelines()
 
     with click.progressbar(pipelines) as pbar:
         for pipeline_name in pbar:
             pipeline = concourse.get_pipeline(pipeline_name)
 
-            update_resource_tag(pipeline, resource_name, resource_tag)
+            # Edit the pipeline
+            if update_resource:
+                resource_name, resource_tag = update_resource.split('=')
+                update_resource_tag(pipeline, resource_name, resource_tag)
+            if update_helm_stable_repo:
+                update_helm_stable_repo_(pipeline, update_helm_stable_repo)
 
             pipeline_path = os.path.join(TMP_DIR, f"{pipeline_name}_UPDATED.json")
             with open(pipeline_path, "w") as file:
                 json.dump(pipeline, file)
 
             if not dry_run:
+                print("\n\nPipeline: {} ".format(pipeline_name))
                 concourse.set_pipeline(
                     pipeline_name,
                     pipeline_path,

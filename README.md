@@ -96,36 +96,44 @@ Generally manually delete a concourse pipeline (using
 automatically re-create a pipeline, and use the
 latest stable version of it.
 
+Alternatively you can edit the pipelines in-place using update-pipelines.py - see next section
+
+## update-pipelines.py
+
+This is a script to make updates to all concourse pipelines, editing them in-place, using fly.
+
+### Usage
+
+Install python dependencies:
+
+```sh
+python3 -m venv venv
+venv/bin/pip install -r requirements.dev.txt
+```
+
+Install fly (Concourse's command-line tool) - see https://github.com/ministryofjustice/analytics-platform/wiki/Concourse#download 
+
+Login to fly (needs re-doing every 24h), choosing a particular environment:
+
+```sh
+fly --target mojap-dev login --team-name main --concourse-url https://concourse.services.dev.mojanalytics.xyz/
+fly --target mojap-alpha login --team-name main --concourse-url https://concourse.services.alpha.mojanalytics.xyz/
+```
+
+Run the update script. Specifying `--fly-target` which is the target you logged into e.g.:
+
+```sh
+venv/bin/python update-pipelines.py --fly-target mojap-dev <other-option>
+```
+
+You need to add another option to specify the nature of the update to each pipeline. This could be `--update-resource` to update the resource version, `--update-helm-stable-repo` to update the helm stable repo, or any other update option that you choose to add to the script.
+
+### --update-resource
+
 If the pipeline change is just in one of the custom
 resource types' version (e.g. `ecr-repo`, `pull-request`,
-`auth0-client`, `helm`, `kubernetes`, etc...) there is
-now a way to set the version of a resource on all
-existing pipelines:
-
-Here an example of how to invoke this script:
-
-```
-$ ./update-pipelines-resource-types.py --help
-Usage: update-pipelines-resource-types.py [OPTIONS]
-
-Options:
-  -b, --fly-binary-path TEXT      path to the fly binary (the Concourse cli)
-  -c, --concourse-url TEXT        URL of Concourse
-  -t, --fly-target TEXT           Concourse's fly target name
-  -n, --concourse-team-name TEXT  Concourse team where the pipelines to update
-                                  are
-
-  -r, --resource-name TEXT        Name of the custom resource to update. Note
-                                  this is the name used in the pipelines (e.g.
-                                  'auth0-client')  [required]
-
-  -v, --resource-tag TEXT         New version/tag of the resource  [required]
-  -d, --dry-run                   When true, will not update the upstream
-                                  Concourse pipeline
-
-  -i, --interactive               Run fly set-pipeline interactively
-  --help                          Show this message and exit.
-```
+`auth0-client`, `helm`, `kubernetes`, etc...) you can set the new version of
+the resource using `--update-resource`
 
 Let's say for example that you want to update all the
 pipelines to use [`concourse-auth0-resource` `v2.0.2`](https://github.com/ministryofjustice/analytics-platform-concourse-auth0-client-resource/releases/tag/v2.0.2).
@@ -141,31 +149,10 @@ This is the command you'd invoke (remove `--dry-run` when
 you want the script to update the upstream Concourse
 pipelines):
 
+```sh
+venv/bin/python/update-pipelines.py --update-resource 'auth0-client=v2.0.2' --dry-run
+[####--------------------------------]   12%  00:01:27
 ```
-$ ./update-pipelines-resource-types.py --resource-name=auth0-client --resource-tag=v2.0.2 --dry-run
-Fly binary path [/usr/local/bin/fly]:
-Concourse url [https://concourse.services.dev.mojanalytics.xyz]:
-Fly target [dev-main]:
-Concourse team name [main]:
-logging in to team 'main'
-
-1: ap-main
-2: Basic Auth
-choose an auth method: 1
-
-navigate to the following URL in your browser:
-
-    https://concourse.services.dev.mojanalytics.xyz/auth/oauth?team_name=main&fly_local_port=59103
-
-or enter token manually: target saved
-  [####--------------------------------]   12%  00:01:27
-```
-
-**NOTE**: script requires Concourse's command line tool
-`fly`. Also be sure you install its dependency by
-running `pip install -r requirements.dev.txt` to be sure
-its Python dependencies are satisfied.
-
 
 ## Contributing
 
