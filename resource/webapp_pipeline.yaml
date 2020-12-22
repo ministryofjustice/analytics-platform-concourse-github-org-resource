@@ -128,6 +128,7 @@ resources:
     repos:
     - name: mojanalytics
       url: http://moj-analytics-helm-repo.s3-website-eu-west-1.amazonaws.com
+    stable_repo: https://charts.helm.sh/stable
 
 - name: deployment-status
   type: kubernetes
