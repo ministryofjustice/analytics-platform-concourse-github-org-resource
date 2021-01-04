@@ -6,6 +6,8 @@ import json
 import os
 import subprocess
 import tempfile
+import copy
+from collections import Counter
 
 
 TMP_DIR = os.path.join(tempfile.gettempdir(), "pipelines")
@@ -69,6 +71,7 @@ class Concourse():
         if non_interactive:
             set_pipeline_args.append("--non-interactive")
 
+        print(set_pipeline_args)
         subprocess.run(set_pipeline_args)
 
 
@@ -106,11 +109,19 @@ def main(fly_binary_path, fly_target, update_resource, update_helm_stable_repo, 
         fly_target=fly_target,
     )
 
-    pipelines = concourse.get_pipelines()
+    pipelines = sorted(concourse.get_pipelines())
+
+    outcomes = Counter()
+    def print_and_save_outcome(outcome):
+        print(outcome)
+        outcomes.update((outcome,))
 
     with click.progressbar(pipelines) as pbar:
         for pipeline_name in pbar:
+            print("\n\nPipeline: {} ".format(pipeline_name))
+
             pipeline = concourse.get_pipeline(pipeline_name)
+            original_pipeline = copy.copy(pipeline)
 
             # Edit the pipeline
             if update_resource:
@@ -119,17 +130,26 @@ def main(fly_binary_path, fly_target, update_resource, update_helm_stable_repo, 
             if update_helm_stable_repo:
                 update_helm_stable_repo_(pipeline, update_helm_stable_repo)
 
+            if pipeline == original_pipeline:
+                print_and_save_outcome('no changes needed')
+                continue
+
             pipeline_path = os.path.join(TMP_DIR, f"{pipeline_name}_UPDATED.json")
             with open(pipeline_path, "w") as file:
                 json.dump(pipeline, file)
 
             if not dry_run:
-                print("\n\nPipeline: {} ".format(pipeline_name))
                 concourse.set_pipeline(
                     pipeline_name,
                     pipeline_path,
                     non_interactive=non_interactive,
                 )
+                print_and_save_outcome('pipeline applied')
+            else:
+                print_and_save_outcome('skipped apply (dry-run mode)')
+
+        print('\n\nSummary of actions:')
+        print(outcomes)
 
 
 if __name__ == "__main__":
