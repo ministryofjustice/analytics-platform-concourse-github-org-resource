@@ -24,6 +24,7 @@ jobs:
         IPS_QUANTUM: ((secrets.ip-quantum))
         IPS_102PF_WIFI: ((secrets.ip-102pf))
         IPS_TURING: ((secrets.ip-turing))
+        IPS_MOJO: ((secrets.ip-mojo))
     - task: parameter-store
       file: common-tasks/param-store-env-vars.yaml
       params:
